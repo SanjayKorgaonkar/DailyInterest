@@ -1,0 +1,22 @@
+{
+  "summary": "Tested five public read APIs and core desktop/mobile UI flows. APIs and navigation passed; two frontend defects found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Dashboard header", "issue": "Eyebrow displays literal '{period}' instead of selected period.", "selector": ".page-head .eyebrow", "priority": "MEDIUM"},
+      {"component": "Facility Master search", "issue": "Typing ICICI leaves all four rows visible; search input is not wired to filtering.", "selector": "[data-testid='facility-search-input']", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_interest_endpoints.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": ["Interpolate the selected period in the Dashboard eyebrow.", "Implement Facility Master search filtering against bank/facility fields."],
+  "critical_code_review_comments": ["Import, report export, refresh, and add-row actions currently provide only local toast feedback; they do not persist or export data as this is a mocked offline MVP."],
+  "updated_files": ["/app/backend/tests/test_interest_endpoints.py", "/app/test_reports/iteration_1.json"],
+  "success_rate": {"backend": "100%", "frontend": "90%"},
+  "seed_data_creation": "None; used existing controlled sample data.",
+  "retest_needed": true,
+  "should_call_test_agent_after_fix": true,
+  "context_for_next_testing_agent": "Dashboard, all requested sidebar pages, tables, report toast, working import toast, and mobile menu were exercised. Facility search and period label need retest.",
+  "rca of the issue": "Dashboard passes a literal string eyebrow=\"CONTROL CENTRE · {period}\" rather than interpolating state. Facility search input has no value state or filtering predicate; it is presentation-only."
+}
