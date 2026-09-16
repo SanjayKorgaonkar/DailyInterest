@@ -13,6 +13,8 @@ STATUS_COLORS = {
     "Auto-matched": colors.HexColor("#0d9488"),
     "Needs review": colors.HexColor("#d1453b"),
 }
+PAGE_W, PAGE_H = A4
+BAND_H = 26 * mm
 
 
 def month_label(month: str) -> str:
@@ -20,9 +22,25 @@ def month_label(month: str) -> str:
     return datetime(y, m, 1).strftime("%B %Y")
 
 
+def _draw_letterhead(canvas, doc):
+    canvas.saveState()
+    canvas.setFillColor(colors.HexColor("#0f172a"))
+    canvas.rect(0, PAGE_H - BAND_H, PAGE_W, BAND_H, fill=1, stroke=0)
+    canvas.setFillColor(colors.HexColor("#d1453b"))
+    canvas.rect(0, PAGE_H - BAND_H - 2, PAGE_W, 2, fill=1, stroke=0)
+    canvas.setFillColor(colors.white)
+    canvas.setFont("Helvetica-Bold", 19)
+    canvas.drawString(16 * mm, PAGE_H - 13 * mm, "LEDGERLINE")
+    canvas.setFillColor(colors.HexColor("#f7b7ae"))
+    canvas.setFont("Helvetica", 8.5)
+    canvas.drawString(16 * mm, PAGE_H - 19 * mm, "INTEREST CONTROL ROOM  \u00b7  BANKING FACILITY RECONCILIATION")
+    canvas.restoreState()
+
+
 def build_monthly_checklist_pdf(month: str, rows: list, totals: dict) -> bytes:
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=20 * mm, bottomMargin=18 * mm, leftMargin=16 * mm, rightMargin=16 * mm)
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=BAND_H + 12 * mm, bottomMargin=18 * mm,
+                            leftMargin=16 * mm, rightMargin=16 * mm)
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("ChecklistTitle", parent=styles["Title"], fontSize=18, textColor=colors.HexColor("#0f172a"))
     sub_style = ParagraphStyle("ChecklistSub", parent=styles["Normal"], fontSize=9, textColor=colors.HexColor("#64748b"))
@@ -69,5 +87,5 @@ def build_monthly_checklist_pdf(month: str, rows: list, totals: dict) -> bytes:
         "<font color='#d1453b'><b>Needs review</b></font> = no bank figure captured for this facility yet.",
         sub_style,
     ))
-    doc.build(elems)
+    doc.build(elems, onFirstPage=_draw_letterhead, onLaterPages=_draw_letterhead)
     return buf.getvalue()
