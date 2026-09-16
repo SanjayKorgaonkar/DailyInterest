@@ -1,0 +1,60 @@
+{
+  "app_type": "hybrid_fullstack",
+  "design_context": "Dashboards & Admin Panels",
+  "archetype": "ARCHETYPE 4: SWISS & HIGH-CONTRAST (Authority, Clarity, Truth) for Financial precision",
+  "typography": {
+    "headings": "Chivo, IBM Plex Sans",
+    "body": "IBM Plex Sans, Inter",
+    "mono": "JetBrains Mono"
+  },
+  "colors": {
+    "base_light": "#F8FAFC",
+    "base_dark": "#0F172A",
+    "primary": "#0F172A",
+    "accent": "#2563EB",
+    "success": "#16A34A",
+    "warning": "#CA8A04",
+    "danger": "#DC2626"
+  },
+  "visual_enhancers": {
+    "borders": "1px solid #E2E8F0 (light) / #334155 (dark)",
+    "shadows": "subtle cardless or sharp 2px shadows",
+    "radius": "rounded-lg"
+  },
+  "grids": {
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-4 gap-6",
+    "tetris_grid": "grid grid-cols-1 lg:grid-cols-12 gap-8"
+  },
+  "layouts": {
+    "desktop_app_layout": "Sidebar navigation (Collapsible, dark obsidian theme) + Top bar with Quick Stats & Bank Selector + Main Content Workspace with dense tables & cards."
+  },
+  "motion": {
+    "transitions": "transition-all duration-200 ease-in-out",
+    "hover_lift": "hover:-translate-y-0.5"
+  },
+  "accessibility": {
+    "contrast": "APCA high contrast compliant for financial data",
+    "focus_states": "focus:ring-2 focus:ring-blue-500"
+  },
+  "media": {},
+  "3d_libraries": {},
+  "image_urls": {},
+  "components_to_use": [
+    "shadcn/ui table",
+    "shadcn/ui dialog",
+    "shadcn/ui tabs",
+    "shadcn/ui select",
+    "shadcn/ui input",
+    "shadcn/ui button",
+    "shadcn/ui card",
+    "recharts for financial metrics & interest variance"
+  ],
+  "instructions_to_main_agent": "Build a fully responsive Windows Desktop App style Banking Facility & Interest Working suite (CC & WCDL) with offline simulation state, complete calculation engine (Interest = Daily Outstanding * Rate * Days / 365), Bank Statement Excel/CSV Importer parser, Reconciliation engine, Reports export (Excel/PDF simulator), and dark/light desktop window wrapper with top title bar.",
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Every interactive element MUST include a data-testid attribute (e.g. data-testid='cc-interest-tab', data-testid='import-statement-btn').",
+    "Never use full transparent backgrounds in headers or overlays.",
+    "Use JetBrains Mono for numeric amounts, interest rates, and days.",
+    "Ensure all financial tables have crisp borders and dense spacing for enterprise clarity.",
+    "Include simulated offline SQLite/IndexedDB state with realistic pre-populated data for ICICI CC, HDFC CC, Axis WCDL, SBI WCDL."
+  ]
+}
