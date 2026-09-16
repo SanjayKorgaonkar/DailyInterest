@@ -1,31 +1,85 @@
-import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
-import { BarChart3, Building2, Calculator, ChevronRight, CircleHelp, FileSpreadsheet, LayoutDashboard, Menu, RefreshCw, Scale, Settings, Upload, WalletCards, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { BarChart3, Building2, Calculator, ChevronRight, CircleHelp, LayoutDashboard, Menu, RefreshCw, Scale, Settings, WalletCards, X } from "lucide-react";
 import "@/App.css";
+import { api } from "./lib/api";
+import { monthLabel, monthOptions } from "./lib/format";
+import Dashboard from "./pages/Dashboard";
+import Facilities from "./pages/Facilities";
+import CCWorking from "./pages/CCWorking";
+import WCDLWorking from "./pages/WCDLWorking";
+import { Reconciliation, Reports } from "./pages/Reports";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-const money = (v) => `₹${(v / 10000000).toFixed(2)} Cr`;
-const rupee = (v) => `₹${(v || 0).toLocaleString("en-IN")}`;
-const fallback = {
-  dashboard:{facilities:4,limit:125000000,outstanding:113150000,available:11850000,month_interest:512840,ytd_interest:1842650,variance:11200},
-  facilities:[{id:"icici-cc",bank:"ICICI Bank",type:"CC",name:"Cash Credit",limit:50000000,outstanding:32000000,rate:8.5,start:"2026-04-01",maturity:"On demand",status:"Active"},{id:"hdfc-cc",bank:"HDFC Bank",type:"CC",name:"Working Capital CC",limit:30000000,outstanding:18400000,rate:8.75,start:"2026-01-15",maturity:"On demand",status:"Active"},{id:"axis-wcdl",bank:"Axis Bank",type:"WCDL",name:"WCDL-AX-2409",limit:50000000,outstanding:50000000,rate:8.5,start:"2026-04-01",maturity:"180 days",status:"Active"},{id:"sbi-wcdl",bank:"SBI",type:"WCDL",name:"WCDL-SBI-1182",limit:25000000,outstanding:12750000,rate:8.25,start:"2026-02-10",maturity:"120 days",status:"Active"}],
-  cc:[{date:"2026-05-01",value_date:"2026-05-01",debit:32000000,credit:0,closing:32000000,days:4,rate:8.5,interest:29753,bank:30120,difference:367},{date:"2026-05-05",value_date:"2026-05-05",debit:1250000,credit:0,closing:33250000,days:8,rate:8.5,interest:62055,bank:61800,difference:-255},{date:"2026-05-13",value_date:"2026-05-13",debit:0,credit:4250000,closing:29000000,days:10,rate:8.5,interest:67397,bank:68120,difference:723},{date:"2026-05-23",value_date:"2026-05-23",debit:600000,credit:0,closing:29600000,days:8,rate:8.5,interest:55123,bank:55200,difference:77}],
-  wcdl:[{loan:"WCDL-AX-2409",drawdown:"2026-04-01",amount:50000000,rate:8.5,repayment:"2026-09-28",prepayment:0,principal:50000000,days:45,interest:523973,bank:523973,variance:0},{loan:"WCDL-SBI-1182",drawdown:"2026-02-10",amount:12750000,rate:8.25,repayment:"2026-06-10",prepayment:0,principal:12750000,days:45,interest:64852,bank:65120,variance:268}],
-  recon:[{particular:"CC Interest",ours:1245000,bank:1251200,difference:6200},{particular:"WCDL Interest",ours:1875000,bank:1875000,difference:0},{particular:"Other Charges",ours:25000,bank:30000,difference:5000},{particular:"Total",ours:3145000,bank:3156200,difference:11200}]
-};
+const EMPTY = { dashboard: { facilities: 0, banks: 0, limit: 0, outstanding: 0, available: 0, utilisation: 0, month_interest: 0, month_bank_interest: 0, ytd_interest: 0, variance: 0, rate_changes: 0 }, facilities: [], recon: [] };
+const NAV = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "facilities", label: "Facility Master", icon: Building2 },
+  { id: "cc", label: "CC Interest Working", icon: Calculator },
+  { id: "wcdl", label: "WCDL Interest Working", icon: WalletCards },
+  { id: "recon", label: "Bank Reconciliation", icon: Scale },
+  { id: "reports", label: "Reports", icon: BarChart3 },
+];
+const MONTHS = monthOptions(12);
 
-function App(){
- const [data,setData]=useState(fallback),[page,setPage]=useState("dashboard"),[mobile,setMobile]=useState(false),[period,setPeriod]=useState("May 2026"),[toast,setToast]=useState("");
- useEffect(()=>{Promise.all(["dashboard","facilities","cc-working","wcdl-working","reconciliation"].map(k=>axios.get(`${API}/${k}`).then(r=>r.data))).then(([dashboard,facilities,cc,wcdl,recon])=>setData({dashboard,facilities,cc,wcdl,recon})).catch(()=>{});},[]);
- const nav=[{id:"dashboard",label:"Dashboard",icon:LayoutDashboard},{id:"facilities",label:"Facility Master",icon:Building2},{id:"cc",label:"CC Interest Working",icon:Calculator},{id:"wcdl",label:"WCDL Interest Working",icon:WalletCards},{id:"recon",label:"Bank Reconciliation",icon:Scale},{id:"reports",label:"Reports",icon:BarChart3}];
- const action=(text)=>{setToast(text);setTimeout(()=>setToast(""),2800)};
- return <div className="app-shell"><aside className={mobile?"sidebar open":"sidebar"}><div className="brand"><div className="brand-mark">₹</div><div><strong>Ledgerline</strong><span>Interest control room</span></div><button className="icon-btn mobile-close" data-testid="close-navigation-button" onClick={()=>setMobile(false)}><X size={18}/></button></div><div className="workspace-label">WORKSPACE</div><nav>{nav.map(n=><button key={n.id} data-testid={`${n.id}-navigation-button`} className={page===n.id?"nav-item active":"nav-item"} onClick={()=>{setPage(n.id);setMobile(false)}}><n.icon size={17}/><span>{n.label}</span>{page===n.id&&<ChevronRight size={15}/>}</button>)}</nav><div className="sidebar-bottom"><button className="nav-item" data-testid="settings-navigation-button" onClick={()=>action("Settings are ready for your next configuration.")}><Settings size={17}/><span>Settings</span></button><div className="offline"><span className="pulse"/>Offline-ready mode<span>Local state synced</span></div></div></aside><main className="main"><header className="topbar"><button className="icon-btn menu-btn" data-testid="open-navigation-button" onClick={()=>setMobile(true)}><Menu size={20}/></button><div className="crumb"><span>Finance /</span><b>{nav.find(x=>x.id===page)?.label}</b></div><div className="top-actions"><select data-testid="period-selector" value={period} onChange={e=>setPeriod(e.target.value)}><option>May 2026</option><option>April 2026</option><option>March 2026</option></select><button className="icon-btn" data-testid="refresh-data-button" onClick={()=>action("Workspace refreshed")}><RefreshCw size={17}/></button><button className="help" data-testid="help-button" onClick={()=>action("Tip: import a CSV statement from CC Interest Working.")}><CircleHelp size={16}/> Help</button><div className="avatar" data-testid="user-avatar">AK</div></div></header><section className="content">{page==="dashboard"&&<Dashboard data={data} onNavigate={setPage} period={period}/>} {page==="facilities"&&<Facilities data={data.facilities} onAction={action}/>} {page==="cc"&&<Working type="cc" rows={data.cc} onAction={action}/>} {page==="wcdl"&&<Working type="wcdl" rows={data.wcdl} onAction={action}/>} {page==="recon"&&<Reconciliation rows={data.recon}/>} {page==="reports"&&<Reports onAction={action}/>}</section></main>{toast&&<div className="toast" data-testid="toast-message">{toast}</div>}</div>
+function App() {
+  const [data, setData] = useState(EMPTY);
+  const [page, setPage] = useState("dashboard");
+  const [mobile, setMobile] = useState(false);
+  const [month, setMonth] = useState(MONTHS[0]);
+  const [toast, setToast] = useState("");
+  const action = (text) => { setToast(text); setTimeout(() => setToast(""), 2800); };
+  const reload = useCallback(() => {
+    Promise.all(["dashboard", "facilities", "reconciliation"].map((k) => api.get(`/${k}`, { params: { month } }).then((r) => r.data)))
+      .then(([dashboard, facilities, recon]) => setData({ dashboard, facilities, recon }))
+      .catch(() => action("Could not reach the interest engine"));
+  }, [month]);
+  useEffect(() => { reload(); }, [reload]);
+  const go = (id) => { setPage(id); setMobile(false); };
+  return (
+    <div className="app-shell">
+      <aside className={mobile ? "sidebar open" : "sidebar"}>
+        <div className="brand">
+          <div className="brand-mark">₹</div>
+          <div><strong>Ledgerline</strong><span>Interest control room</span></div>
+          <button className="icon-btn mobile-close" data-testid="close-navigation-button" onClick={() => setMobile(false)}><X size={18} /></button>
+        </div>
+        <div className="workspace-label">WORKSPACE</div>
+        <nav>
+          {NAV.map((n) => (
+            <button key={n.id} data-testid={`${n.id}-navigation-button`} className={page === n.id ? "nav-item active" : "nav-item"} onClick={() => go(n.id)}>
+              <n.icon size={17} /><span>{n.label}</span>{page === n.id && <ChevronRight size={15} />}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <button className="nav-item" data-testid="settings-navigation-button" onClick={() => go("facilities")}><Settings size={17} /><span>Settings</span></button>
+          <div className="offline"><span className="pulse" />Engine connected<span>Actual/365 · Actual/360 per facility</span></div>
+        </div>
+      </aside>
+      <main className="main">
+        <header className="topbar">
+          <button className="icon-btn menu-btn" data-testid="open-navigation-button" onClick={() => setMobile(true)}><Menu size={20} /></button>
+          <div className="crumb"><span>Finance /</span><b>{NAV.find((x) => x.id === page)?.label}</b></div>
+          <div className="top-actions">
+            <select data-testid="period-selector" value={month} onChange={(e) => setMonth(e.target.value)}>
+              {MONTHS.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+            </select>
+            <button className="icon-btn" data-testid="refresh-data-button" onClick={() => { reload(); action("Workspace refreshed"); }}><RefreshCw size={17} /></button>
+            <button className="help" data-testid="help-button" onClick={() => action("Tip: add rate changes from Facility Master → Rate history.")}><CircleHelp size={16} /> Help</button>
+            <div className="avatar" data-testid="user-avatar">AK</div>
+          </div>
+        </header>
+        <section className="content">
+          {page === "dashboard" && <Dashboard data={data} onNavigate={go} month={month} />}
+          {page === "facilities" && <Facilities data={data.facilities} onAction={action} reload={reload} />}
+          {page === "cc" && <CCWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} />}
+          {page === "wcdl" && <WCDLWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} />}
+          {page === "recon" && <Reconciliation rows={data.recon} month={month} onAction={action} />}
+          {page === "reports" && <Reports onAction={action} month={month} />}
+        </section>
+      </main>
+      {toast && <div className="toast" data-testid="toast-message">{toast}</div>}
+    </div>
+  );
 }
 
-function Header({eyebrow,title,sub,children}){return <div className="page-head"><div><div className="eyebrow">{eyebrow}</div><h1 data-testid="page-title">{title}</h1><p data-testid="page-description">{sub}</p></div><div className="head-actions">{children}</div></div>}
-function Dashboard({data,onNavigate,period}){let d=data.dashboard;return <><Header eyebrow={`CONTROL CENTRE · ${period}`} title="Good morning, Ankit" sub="Here’s the position across your working capital facilities."><button className="primary" data-testid="add-facility-button" onClick={()=>onNavigate("facilities")}>+ Add facility</button></Header><div className="metric-grid">{[["Total facilities",d.facilities,"Across 3 banks","blue"],["Sanctioned limit",money(d.limit),"₹12.5 Cr total capacity","navy"],["Current outstanding",money(d.outstanding),"90.5% utilisation","orange"],["Available limit",money(d.available),"9.5% headroom","green"]].map((x,i)=><div className={`metric ${x[3]}`} key={x[0]} data-testid={`metric-${i}`}><span>{x[0]}</span><strong>{x[1]}</strong><small>{x[2]}</small></div>)}</div><div className="dashboard-grid"><div className="section-block"><div className="section-title"><div><span className="eyebrow">PORTFOLIO VIEW</span><h2>Interest at a glance</h2></div><span className="formula">Actual / 365</span></div><div className="interest-row"><div className="interest-main"><span>Current month interest</span><strong data-testid="current-month-interest">{rupee(d.month_interest)}</strong><em>↑ 4.2% vs April</em></div><div className="mini-bars" aria-label="Monthly interest trend">{[35,48,42,65,58,78,69,90].map((h,i)=><i key={i} style={{height:`${h}%`}}/> )}</div></div><div className="split-stats"><div><span>YTD interest expense</span><b>{rupee(d.ytd_interest)}</b></div><div><span>Bank variance flagged</span><b className="danger-text">{rupee(d.variance)}</b></div></div></div><div className="section-block bank-panel"><div className="section-title"><div><span className="eyebrow">BY BANK</span><h2>Facility exposure</h2></div><button className="text-btn" data-testid="view-facilities-button" onClick={()=>onNavigate("facilities")}>View all →</button></div>{data.facilities.slice(0,4).map(f=><div className="bank-line" key={f.id}><span className="bank-logo">{f.bank.slice(0,2)}</span><div><b>{f.bank}</b><small>{f.type} · {f.rate}%</small></div><strong>{money(f.outstanding)}</strong><span className="bar"><i style={{width:`${f.outstanding/f.limit*100}%`}}/></span></div>)}</div></div><div className="quick-strip"><div><Upload size={18}/><div><b>Import bank statement</b><span>CSV or Excel · auto-map transactions</span></div></div><button className="outline" data-testid="import-statement-button" onClick={()=>onNavigate("cc")}>Start import</button></div></>}
-function Facilities({data,onAction}){const [query,setQuery]=useState("");const filtered=data.filter(f=>`${f.bank} ${f.name} ${f.type}`.toLowerCase().includes(query.toLowerCase()));return <><Header eyebrow="MASTER DATA · 04 FACILITIES" title="Facility master" sub="Keep limits, pricing and tenor in one controlled register."><button className="primary" data-testid="new-facility-button" onClick={()=>onAction("New facility form opened")}>+ New facility</button></Header><div className="table-wrap"><div className="table-toolbar"><b>All facilities <span className="count">{filtered.length}</span></b><input data-testid="facility-search-input" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search bank or facility…"/></div><table><thead><tr><th>Bank / facility</th><th>Type</th><th>Sanctioned limit</th><th>Outstanding</th><th>Rate</th><th>Start date</th><th>Maturity</th><th>Status</th></tr></thead><tbody>{filtered.map(f=><tr key={f.id}><td><b>{f.bank}</b><small>{f.name}</small></td><td><span className={`tag ${f.type.toLowerCase()}`}>{f.type}</span></td><td className="mono">{money(f.limit)}</td><td className="mono">{money(f.outstanding)}</td><td className="mono">{f.rate.toFixed(2)}%</td><td>{f.start}</td><td>{f.maturity}</td><td><span className="status">● {f.status}</span></td></tr>)}</tbody></table></div></>}
-function Working({type,rows,onAction}){let cc=type==="cc";return <><Header eyebrow={`INTEREST ENGINE · ${cc?"CASH CREDIT":"WCDL"}`} title={cc?"CC interest working":"WCDL interest working"} sub={cc?"Daily debit balance calculation with value-date control.":"Term-loan principal, tenor and prepayment tracking."}><button className="outline" data-testid="import-working-button" onClick={()=>onAction("Import dialog opened")}> <Upload size={15}/> Import statement</button><button className="primary" data-testid="add-working-row-button" onClick={()=>onAction("New working row added")}>+ Add row</button></Header><div className="working-note"><Calculator size={17}/><span><b>Formula active:</b> Daily outstanding × interest rate × days ÷ 365</span><span className="note-right">{cc?"Value date basis":"Actual / 365"}</span></div><div className="table-wrap"><div className="table-toolbar"><b>{cc?"CC transaction ledger":"WCDL loan ledger"}</b><span className="toolbar-total">Calculated interest <strong>{rupee(rows.reduce((a,r)=>a+(r.interest||0),0))}</strong></span></div><table><thead><tr>{(cc?["Transaction date","Value date","Debit","Credit","Closing outstanding","Days","Rate","Our interest","Bank charged","Difference"]:["Loan number","Drawdown","Amount","Rate","Repayment","Prepayment","Principal","Days","Our interest","Bank interest","Variance"]).map(x=><th key={x}>{x}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{cc?<><td>{r.date}</td><td>{r.value_date}</td><td className="mono">{rupee(r.debit)}</td><td className="mono positive">{rupee(r.credit)}</td><td className="mono">{rupee(r.closing)}</td><td className="mono">{r.days}</td><td className="mono">{r.rate}%</td><td className="mono">{rupee(r.interest)}</td><td className="mono">{rupee(r.bank)}</td><td className={`mono ${r.difference>0?"danger-text":"positive"}`}>{r.difference>0?"+":""}{rupee(r.difference)}</td></>:<><td><b>{r.loan}</b></td><td>{r.drawdown}</td><td className="mono">{money(r.amount)}</td><td className="mono">{r.rate}%</td><td>{r.repayment}</td><td className="mono">{rupee(r.prepayment)}</td><td className="mono">{money(r.principal)}</td><td className="mono">{r.days}</td><td className="mono">{rupee(r.interest)}</td><td className="mono">{rupee(r.bank)}</td><td className={`mono ${r.variance?"danger-text":"positive"}`}>{r.variance?`+${rupee(r.variance)}`:"Nil"}</td></>}</tr>)}</tbody></table></div></>}
-function Reconciliation({rows}){return <><Header eyebrow="CONTROL CHECK · MAY 2026" title="Bank reconciliation" sub="Compare your calculated interest against bank debits before posting."><button className="primary" data-testid="export-reconciliation-button">Export report</button></Header><div className="recon-summary"><div><span>Our working</span><strong>{rupee(rows.at(-1).ours)}</strong></div><div><span>Bank debit</span><strong>{rupee(rows.at(-1).bank)}</strong></div><div className="variance-box"><span>Total variance</span><strong>{rupee(rows.at(-1).difference)}</strong><small>Needs review</small></div></div><div className="table-wrap"><table><thead><tr><th>Particular</th><th>Our working</th><th>Bank debit</th><th>Difference</th><th>Review</th></tr></thead><tbody>{rows.map((r,i)=><tr key={r.particular} className={i===rows.length-1?"total-row":""}><td><b>{r.particular}</b></td><td className="mono">{rupee(r.ours)}</td><td className="mono">{rupee(r.bank)}</td><td className={`mono ${r.difference?"danger-text":"positive"}`}>{r.difference?`+${rupee(r.difference)}`:"Nil"}</td><td>{r.difference?<span className="review">Review</span>:<span className="matched">Matched</span>}</td></tr>)}</tbody></table></div></>}
-function Reports({onAction}){return <><Header eyebrow="REPORTING · EXPORT CENTRE" title="Reports" sub="Turn your interest working into a monthly MIS in a few clicks."/><div className="report-grid">{["Bank-wise interest report","Facility-wise report","Monthly interest MIS","Daily outstanding","Rate change report","Excess / short interest"].map((x,i)=><button className="report-item" data-testid={`report-${i}-button`} onClick={()=>onAction(`${x} prepared`)} key={x}><FileSpreadsheet size={22}/><div><b>{x}</b><span>May 2026 · Excel / PDF</span></div><ChevronRight size={17}/></button>)}</div></>}
 export default App;
