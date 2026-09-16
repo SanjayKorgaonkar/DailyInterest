@@ -38,11 +38,12 @@ WCDL_LOANS = [
 
 
 async def seed_if_empty(db):
-    if await db.facilities.count_documents({}):
-        return
-    for i, f in enumerate(FACILITIES):
-        await db.facilities.insert_one({**f, "created_at": _now(i)})
-    for i, t in enumerate(CC_TRANSACTIONS):
-        await db.cc_transactions.insert_one({**t, "id": _id(), "created_at": _now(i)})
-    for i, l in enumerate(WCDL_LOANS):
-        await db.wcdl_loans.insert_one({**l, "id": _id(), "created_at": _now(i)})
+    if not await db.facilities.count_documents({}):
+        for i, f in enumerate(FACILITIES):
+            await db.facilities.insert_one({**f, "created_at": _now(i)})
+    if not await db.cc_transactions.count_documents({}):
+        for i, t in enumerate(CC_TRANSACTIONS):
+            await db.cc_transactions.insert_one({**t, "id": _id(), "created_at": _now(i)})
+    if not await db.wcdl_loans.count_documents({}):
+        for i, l in enumerate(WCDL_LOANS):
+            await db.wcdl_loans.insert_one({**l, "id": _id(), "created_at": _now(i)})

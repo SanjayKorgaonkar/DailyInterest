@@ -1,0 +1,44 @@
+{
+  "summary": "Full-stack regression on new Rate History + day-count feature. Backend: 11/11 pytest cases pass covering facility CRUD, rate history add/duplicate/delete-last-guard, CC engine period splits (HDFC rate change on 15-May), Actual/360 vs Actual/365 conversion (icici-cc scaling to 30222.22), opening-row generation for June, CC transaction validation, WCDL prepayment segmenting, dashboard totals, and reconciliation. Frontend: Dashboard metrics + rate-changes-badge, Facility Master convention column, Rate History drawer (timeline, day-count toggles, add/delete), CC Working segment row rendering with 'RATE CHANGE' label and highlighted 9.25% pill, New Facility modal with WCDL/Actual-360 creation, WCDL Working, Reconciliation and Reports navigation all worked. Two data/spec issues surfaced (see below).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/wcdl-working", "issue": "Axis WCDL seed loan (WCDL-AX-2409) was missing from wcdl_loans collection on start. seed_if_empty only checks facilities count, so if facilities exist but loan collection is empty (e.g. a prior test wiped it) it will NOT reseed. Recommend seeding transactions/loans independently or based on their own count. I re-inserted the loan manually so the seed state is now restored."},
+      {"endpoint": "/api/cc-working (icici-cc, month=2026-05, last row)", "issue": "Review-request expected 8 days / 55,155.62 for the 23-May row, but engine (consistently, using end=1st of next month) produces 9 days / 62,038.36. HDFC last row (2 days) is also computed with the same convention and matches its own expected value, so engine is internally consistent. Spec expected values for icici May last row appear off; either update spec or decide whether last row should end at last calendar day of the month."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "All pages (dev overlay)", "issues": ["React hydration warning in console: 'In HTML, <span> cannot be a child of <option>' – caused by the x-ve-dynamic instrumentation wrapping option labels with a span. Cosmetic/dev-only; no functional impact."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_backend_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Make seed idempotent per-collection so missing wcdl_loans / cc_transactions get restored even if facilities already exist (currently seed_if_empty only checks facilities count).",
+    "Reconcile the icici-cc last-row expected value in the spec (8 days / 55,155.62) with engine output (9 days / 62,038.36). Decide if last segment should end at date(y,m,last_day) rather than first-of-next-month.",
+    "(Optional) Strip x-ve-dynamic span wrapping around <option> to silence the hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py restart already covered by hot-reload. Good separation of engine.py/seed.py/server.py.",
+    "cc_rows returns row 'closing' equal to running balance and correctly injects an opening row when month has no in-month transactions – nice.",
+    "Facility DELETE cascades cc_transactions/wcdl_loans – good.",
+    "Rate history GET-last-remaining guard (400) is enforced and duplicate effective_date is rejected – good.",
+    "engine.split_periods uses set() of points which is deterministic after sorting, good.",
+    "Consider fy_start not stopping the ytd loop when cursor already equals end (small optimization)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_backend_api.py",
+    "/app/test_reports/iteration_2.json"
+  ],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "100% of exercised flows"},
+  "seed_data_creation": "Re-inserted the axis-wcdl seed loan (WCDL-AX-2409, drawdown 2026-04-01, amount 5,00,00,000, repayment 2026-09-28, bank_interest 361000) directly into MongoDB because it was missing at test-start. All 4 seeded facilities and their expected rate_history counts (icici-cc:1, hdfc-cc:2, axis-wcdl:1, sbi-wcdl:1) are restored. Any TEST_* facilities and 2026-05-20 rate entries created during testing have been cleaned up.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend suite is at /app/backend/tests/test_backend_api.py – run with `REACT_APP_BACKEND_URL=<url> pytest backend/tests/test_backend_api.py`. Frontend flows tested end-to-end via Playwright, including drawer / segment row / new-facility modal / convention toggle. If the axis WCDL loan disappears again (seed_if_empty bug), re-insert as documented in seed.py.",
+  "rca_of_the_issue": "seed_if_empty only guards on facilities count – if only wcdl_loans got wiped by a prior test iteration, the reseed short-circuits and axis-wcdl ends up loan-less, which breaks WCDL working & dashboard variance. Fix: check each collection independently or bootstrap the fixture data with upserts keyed on a natural id."
+}
