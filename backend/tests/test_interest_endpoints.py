@@ -9,8 +9,8 @@ def test_interest_read_endpoints_have_expected_data():
     expected = {
         "dashboard": dict,
         "facilities": list,
-        "cc-working": list,
-        "wcdl-working": list,
+        "cc-working": dict,
+        "wcdl-working": dict,
         "reconciliation": list,
     }
     for endpoint, response_type in expected.items():

@@ -83,10 +83,19 @@ def to_float(raw) -> float:
     return -abs(val) if negative else val
 
 
+ISO_DATE_RE = re.compile(r"^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$")
+
+
 def to_date(raw) -> str:
     s = str(raw).strip()
     if not s:
         return None
+    iso = ISO_DATE_RE.match(s)
+    if iso:
+        try:
+            return date(int(iso.group(1)), int(iso.group(2)), int(iso.group(3))).isoformat()
+        except ValueError:
+            return None
     try:
         return dateparser.parse(s, dayfirst=True).date().isoformat()
     except (ValueError, OverflowError):

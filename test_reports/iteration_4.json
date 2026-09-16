@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 4 tested the new Bank Interest Auto-Match + Bank Certificate feature end-to-end via the frontend. All frontend acceptance criteria PASSED: (a) certificate strip renders on CC Working with add/save/edit/remove flow and correctly overrides cc-total-bank & cc-total-difference; (b) removing the certificate reverts totals to the calculated sum; (c) WCDL strip is conditional on facility selection — hidden for 'All WCDL facilities', shown for a specific facility (axis-wcdl); (d) certificate amount input has min=0 and backend rejects negative amount with HTTP 422 (Pydantic ge=0); (e) Dashboard 'Bank charged' + variance and Bank Reconciliation table both reflect the override live after certificate is saved; (f) CC statement import auto-matches interest narration rows — exactly 1 teal 'Auto' badge in the preview for the 'Interest debited for May 2026' row and none for the other two, badge persists in the ledger after commit via [data-testid^='cc-auto-matched-']. Regression smoke check on CC/WCDL working tables, facility select, import upload->map->commit->result and month picker also passed. Data integrity note: seed rows for icici-cc unchanged (4 rows, outstanding=29,600,000); hdfc outstanding=16,000,000 after cleanup of all 3 imported test transactions (deleted individually by id).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/cc-transactions/import/parse or /commit", "issue": "Date parsing ambiguity: CSV row with ISO date '2026-05-10' is imported as '2026-10-05' (Oct 5 instead of May 10). The 'Interest debited' row dated '2026-05-15' parsed correctly (day > 12 disambiguates), so root cause is likely pandas/dateutil defaulting to month-first parsing when both fields ≤ 12 despite YYYY-MM-DD being explicit ISO. Reproduced deterministically with attached /tmp/test_stmt.csv."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Header selects (month + facility)", "issues": ["React hydration warning: <span> nested inside <option> due to dev-tool instrumentation (x-ve-dynamic spans injected around option text). Cosmetic dev-only warning; does not affect functionality."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_statement_import.py", "/app/backend/tests/test_interest_endpoints.py", "/app/backend/tests/test_backend_api.py"],
+  "action_items": [
+    "Investigate ISO-date misparsing in import_utils.normalize_rows: rows written as YYYY-MM-DD (e.g. 2026-05-10) can be reinterpreted as month-first (2026-10-05). Suggest forcing pandas.to_datetime(..., format='%Y-%m-%d', errors='coerce') as a fast-path before the dayfirst=True fallback, or dispatching by regex on the raw string."
+  ],
+  "critical_code_review_comments": [
+    "BankCertificate.jsx save() converts value with Number(value) — a stray non-numeric input would send NaN; while backend Pydantic will 422 it, adding a client-side isFinite/>=0 guard would show a friendlier error and prevent the network call.",
+    "CCWorking.jsx passes working?.calculated_bank || 0 to <BankCertificate> — if the backend legitimately returns 0 for a month with no debits, the strip's 'overrides calculated ₹0' copy is still shown; acceptable but consider hiding the strip when calculated_bank===0 and no cert exists.",
+    "WCDL certificate strip visibility depends on facilityId truthiness. Good — matches spec. Consider disabling the option value='' (All) styling to hint that certificate-strip is per-facility."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "None required (no auth).",
+  "seed_data_creation": "None. Created 3 transient CC transactions via CSV import against hdfc-cc; all 3 were deleted by exact id after test. Verified icici-cc still has its 4 original seed rows (dates 2026-05-01, 05, 13, 23) and ICICI outstanding=29,600,000 / HDFC=16,000,000 post-cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Certificate + auto-match UI wiring is fully green. The only outstanding finding is the ISO-date misparsing in the statement importer (2026-05-10 → 2026-10-05). It is NOT part of this iteration's feature scope but should be fixed to avoid silently landing rows in the wrong month. Test CSV used: /tmp/test_stmt.csv. When cleaning up after import tests, always delete transactions by exact id via DELETE /api/cc-transactions/{id} (as done here) — never bulk delete by facility_id.",
+  "rca_of_the_issue": "Import date bug RCA: normalize_rows likely uses pandas.to_datetime with dayfirst inference. For unambiguous days (>12) it parses correctly (that's why 2026-05-15 → May 15). For 2026-05-10, both fields are ≤12 so pandas' default (month-first) wins and yields 2026-10-05. Mitigation: parse with an explicit ISO format first, then fall back to dayfirst=True for regional statements."
+}

@@ -1,4 +1,9 @@
-"""Backend tests for CC bank-statement CSV/XLSX import (parse + commit)."""
+"""Backend tests for CC bank-statement CSV/XLSX import (parse + commit).
+
+Uses a disposable CC facility created per-test (never the shared seeded
+icici-cc/hdfc-cc facilities) so destructive import/commit operations can
+never wipe real seed data.
+"""
 import io
 import os
 import pytest
@@ -23,19 +28,16 @@ CSV_SINGLE_AMOUNT = (
 ).encode()
 
 
-def _icici_id():
-    r = requests.get(f"{API}/facilities", timeout=30)
-    for f in r.json():
-        if f["id"] == "icici-cc":
-            return f["id"]
-    pytest.skip("icici-cc facility missing")
-
-
-def _cleanup(fid):
-    txns = requests.get(f"{API}/cc-working", params={"facility_id": fid, "month": "2026-05"}, timeout=30).json()["rows"]
-    for r in txns:
-        if r.get("id") and not r.get("segment") and not r.get("opening"):
-            requests.delete(f"{API}/cc-transactions/{r['id']}", timeout=30)
+@pytest.fixture
+def temp_cc_facility():
+    """Create a disposable CC facility for this test only; deleting it cascades to its cc_transactions."""
+    payload = {"bank": "Test Bank", "type": "CC", "name": "Import Test CC",
+               "limit": 10000000, "start": "2026-01-01", "rate": 9.0, "day_count": 365}
+    r = requests.post(f"{API}/facilities", json=payload, timeout=30)
+    assert r.status_code == 201, r.text
+    fid = r.json()["id"]
+    yield fid
+    requests.delete(f"{API}/facilities/{fid}", timeout=30)
 
 
 def test_parse_csv_auto_mapping():
@@ -64,15 +66,12 @@ def test_parse_headers_only_rejected():
     assert r.status_code == 400
 
 
-def test_dry_run_and_commit_and_persistence():
-    fid = _icici_id()
-    _cleanup(fid)
-    # parse
+def test_dry_run_and_commit_and_persistence(temp_cc_facility):
+    fid = temp_cc_facility
     files = {"file": ("stmt.csv", CSV_STANDARD, "text/csv")}
     parsed = requests.post(f"{API}/cc-transactions/import/parse", files=files, timeout=30).json()
     mapping = parsed["mapping"]
     rows = parsed["rows"]
-    # dry_run
     dry = requests.post(f"{API}/cc-transactions/import/commit",
                        json={"facility_id": fid, "mapping": mapping, "rows": rows, "dry_run": True}, timeout=30)
     assert dry.status_code == 201
@@ -80,36 +79,30 @@ def test_dry_run_and_commit_and_persistence():
     assert dd["inserted"] == 0
     assert dd["skipped"] == 2  # invalid date + no amount
     assert len(dd["transactions"]) == 3
-    # commit
     commit = requests.post(f"{API}/cc-transactions/import/commit",
                           json={"facility_id": fid, "mapping": mapping, "rows": rows, "dry_run": False}, timeout=30)
     assert commit.status_code == 201
     cd = commit.json()
     assert cd["inserted"] == 3
     assert cd["skipped"] == 2
-    # verify persisted via cc-working
     working = requests.get(f"{API}/cc-working", params={"facility_id": fid, "month": "2026-05"}, timeout=30).json()
     real_rows = [r for r in working["rows"] if not r.get("segment") and not r.get("opening")]
     dates = sorted(r["date"] for r in real_rows)
     assert "2026-05-01" in dates
     assert "2026-05-05" in dates
     assert "2026-05-10" in dates
-    _cleanup(fid)
 
 
-def test_commit_without_date_col_rejected():
-    fid = _icici_id()
+def test_commit_without_date_col_rejected(temp_cc_facility):
     r = requests.post(f"{API}/cc-transactions/import/commit",
-                     json={"facility_id": fid, "mapping": {"date_col": None}, "rows": [], "dry_run": False}, timeout=30)
+                     json={"facility_id": temp_cc_facility, "mapping": {"date_col": None}, "rows": [], "dry_run": False}, timeout=30)
     assert r.status_code == 400
 
 
-def test_single_amount_column_with_drcr():
-    fid = _icici_id()
-    _cleanup(fid)
+def test_single_amount_column_with_drcr(temp_cc_facility):
+    fid = temp_cc_facility
     files = {"file": ("s.csv", CSV_SINGLE_AMOUNT, "text/csv")}
     p = requests.post(f"{API}/cc-transactions/import/parse", files=files, timeout=30).json()
-    # Override mapping to use amount_col + dr_cr_col path
     mapping = {"date_col": "Date", "value_date_col": "Date", "debit_col": None, "credit_col": None,
                "amount_col": "Amount", "dr_cr_col": "Type", "narration_col": "Description", "bank_interest_col": None}
     dry = requests.post(f"{API}/cc-transactions/import/commit",
@@ -122,9 +115,10 @@ def test_single_amount_column_with_drcr():
     assert by_date["2026-05-06"]["credit"] == 75000 and by_date["2026-05-06"]["debit"] == 0
 
 
-def test_xlsx_parse_and_commit():
+def test_xlsx_parse_and_commit(temp_cc_facility):
     pd = pytest.importorskip("pandas")
     pytest.importorskip("openpyxl")
+    fid = temp_cc_facility
     df = pd.DataFrame([
         {"Txn Date": "03-05-2026", "Value Date": "03-05-2026", "Withdrawal Amt": 10000, "Deposit Amt": None, "Narration": "Cheque"},
         {"Txn Date": "07-05-2026", "Value Date": "07-05-2026", "Withdrawal Amt": None, "Deposit Amt": 40000, "Narration": "NEFT"},
@@ -138,13 +132,27 @@ def test_xlsx_parse_and_commit():
     d = r.json()
     assert d["row_count"] == 2
     assert d["mapping"]["date_col"] == "Txn Date"
-    fid = _icici_id()
-    _cleanup(fid)
     c = requests.post(f"{API}/cc-transactions/import/commit",
                      json={"facility_id": fid, "mapping": d["mapping"], "rows": d["rows"], "dry_run": False}, timeout=30)
     assert c.status_code == 201
     assert c.json()["inserted"] == 2
-    _cleanup(fid)
+
+
+def test_iso_date_not_misparsed_as_month_first(temp_cc_facility):
+    """2026-05-10 must parse as 10 May, not 5 Oct (regression for dateutil dayfirst quirk)."""
+    fid = temp_cc_facility
+    csv_bytes = (
+        "Date,Debit,Credit,Narration\n"
+        "2026-05-10,5000,,ISO date row\n"
+    ).encode()
+    files = {"file": ("iso.csv", csv_bytes, "text/csv")}
+    parsed = requests.post(f"{API}/cc-transactions/import/parse", files=files, timeout=30).json()
+    commit = requests.post(f"{API}/cc-transactions/import/commit",
+                          json={"facility_id": fid, "mapping": parsed["mapping"], "rows": parsed["rows"], "dry_run": False},
+                          timeout=30)
+    assert commit.status_code == 201
+    txns = commit.json()["transactions"]
+    assert txns[0]["date"] == "2026-05-10"
 
 
 def test_commit_on_wcdl_rejected():
