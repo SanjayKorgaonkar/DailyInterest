@@ -6,13 +6,14 @@ import { BankCertificate } from "../components/BankCertificate";
 import { api, errorText } from "../lib/api";
 import { rupee, pct, fmtDate, monthLong, today } from "../lib/format";
 
-export default function CCWorking({ facilities, month, onAction, refreshAll }) {
+export default function CCWorking({ facilities, month, onAction, refreshAll, focusFacilityId }) {
   const ccFacilities = facilities.filter((f) => f.type === "CC");
   const [facilityId, setFacilityId] = useState(ccFacilities[0]?.id || "");
   const [working, setWorking] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   useEffect(() => { if (!facilityId && ccFacilities[0]) setFacilityId(ccFacilities[0].id); }, [ccFacilities, facilityId]);
+  useEffect(() => { if (focusFacilityId) setFacilityId(focusFacilityId); }, [focusFacilityId]);
   const load = () => { if (facilityId) api.get("/cc-working", { params: { facility_id: facilityId, month } }).then((r) => setWorking(r.data)).catch((e) => onAction(errorText(e))); };
   useEffect(load, [facilityId, month]); // eslint-disable-line react-hooks/exhaustive-deps
   const remove = async (id) => {

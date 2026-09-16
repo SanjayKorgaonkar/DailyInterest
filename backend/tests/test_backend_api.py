@@ -164,25 +164,34 @@ def test_wcdl_working_june():
 
 
 def test_wcdl_loan_add_prepayment_and_validation():
-    # invalid repayment <= drawdown
-    r = requests.post(f"{API}/wcdl-loans",
-                      json={"facility_id": "axis-wcdl", "loan": "TEST-BAD",
-                            "drawdown": "2026-05-10", "amount": 1000000, "repayment": "2026-05-10"}, timeout=30)
-    assert r.status_code == 400
-    # valid loan with prepayment mid-month
-    r = requests.post(f"{API}/wcdl-loans",
-                      json={"facility_id": "axis-wcdl", "loan": "TEST-PP",
-                            "drawdown": "2026-05-01", "amount": 2000000, "repayment": "2026-05-31",
-                            "prepayment": 500000, "prepayment_date": "2026-05-15"}, timeout=30)
+    # Use a disposable WCDL facility so this destructive test never touches shared seed data.
+    payload = {"bank": "Test Bank", "type": "WCDL", "name": "Loan Test WCDL",
+               "limit": 10000000, "start": "2026-01-01", "rate": 8.5, "day_count": 365}
+    r = requests.post(f"{API}/facilities", json=payload, timeout=30)
     assert r.status_code == 201, r.text
-    lid = r.json()["id"]
-    d = requests.get(f"{API}/wcdl-working", params={"facility_id": "axis-wcdl", "month": "2026-05"}, timeout=30).json()
-    my_rows = [x for x in d["rows"] if x["id"] == lid]
-    assert len(my_rows) == 2  # two segments due to prepayment
-    principals = sorted([row["principal"] for row in my_rows])
-    assert principals[0] == 1500000 and principals[1] == 2000000
-    r = requests.delete(f"{API}/wcdl-loans/{lid}", timeout=30)
-    assert r.status_code == 204
+    fid = r.json()["id"]
+    try:
+        # invalid repayment <= drawdown
+        r = requests.post(f"{API}/wcdl-loans",
+                          json={"facility_id": fid, "loan": "TEST-BAD",
+                                "drawdown": "2026-05-10", "amount": 1000000, "repayment": "2026-05-10"}, timeout=30)
+        assert r.status_code == 400
+        # valid loan with prepayment mid-month
+        r = requests.post(f"{API}/wcdl-loans",
+                          json={"facility_id": fid, "loan": "TEST-PP",
+                                "drawdown": "2026-05-01", "amount": 2000000, "repayment": "2026-05-31",
+                                "prepayment": 500000, "prepayment_date": "2026-05-15"}, timeout=30)
+        assert r.status_code == 201, r.text
+        lid = r.json()["id"]
+        d = requests.get(f"{API}/wcdl-working", params={"facility_id": fid, "month": "2026-05"}, timeout=30).json()
+        my_rows = [x for x in d["rows"] if x["id"] == lid]
+        assert len(my_rows) == 2  # two segments due to prepayment
+        principals = sorted([row["principal"] for row in my_rows])
+        assert principals[0] == 1500000 and principals[1] == 2000000
+        r = requests.delete(f"{API}/wcdl-loans/{lid}", timeout=30)
+        assert r.status_code == 204
+    finally:
+        requests.delete(f"{API}/facilities/{fid}", timeout=30)
 
 
 # ---------- Dashboard & Reconciliation ----------

@@ -25,6 +25,7 @@ function App() {
   const [page, setPage] = useState("dashboard");
   const [mobile, setMobile] = useState(false);
   const [month, setMonth] = useState(MONTHS[0]);
+  const [jumpFacility, setJumpFacility] = useState(null);
   const [toast, setToast] = useState("");
   const action = (text) => { setToast(text); setTimeout(() => setToast(""), 2800); };
   const reload = useCallback(() => {
@@ -33,7 +34,12 @@ function App() {
       .catch(() => action("Could not reach the interest engine"));
   }, [month]);
   useEffect(() => { reload(); }, [reload]);
-  const go = (id) => { setPage(id); setMobile(false); };
+  const go = (id, opts) => {
+    setPage(id);
+    setMobile(false);
+    if (opts?.month) setMonth(opts.month);
+    setJumpFacility(opts?.facilityId || null);
+  };
   return (
     <div className="app-shell">
       <aside className={mobile ? "sidebar open" : "sidebar"}>
@@ -71,8 +77,8 @@ function App() {
         <section className="content">
           {page === "dashboard" && <Dashboard data={data} onNavigate={go} month={month} />}
           {page === "facilities" && <Facilities data={data.facilities} onAction={action} reload={reload} />}
-          {page === "cc" && <CCWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} />}
-          {page === "wcdl" && <WCDLWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} />}
+          {page === "cc" && <CCWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} />}
+          {page === "wcdl" && <WCDLWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} />}
           {page === "recon" && <Reconciliation rows={data.recon} month={month} onAction={action} />}
           {page === "reports" && <Reports onAction={action} month={month} />}
         </section>

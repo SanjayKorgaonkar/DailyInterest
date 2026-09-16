@@ -34,7 +34,16 @@ td.empty{text-align:center;color:var(--muted);padding:36px;white-space:normal}
 .certificate-strip b{font-family:'JetBrains Mono';color:#7a5306}
 .certificate-strip .text-btn{color:#a15c00;font-weight:600}
 .auto-badge{display:inline-flex;align-items:center;gap:3px;background:#e6f7f2;color:#0d9488;border:1px solid #99e6d6;padding:2px 6px;font-size:9px;font-weight:700;margin-left:7px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
+.cert-reminder{display:flex;align-items:flex-start;gap:14px;background:#fff1f0;border:1px solid #f3b4ae;border-left:4px solid #d1453b;padding:16px 20px;margin-bottom:28px}
+.cert-reminder>svg{color:#d1453b;flex-shrink:0;margin-top:2px}
+.cert-reminder>div:not(.cert-reminder-pills){flex:1;min-width:200px}
+.cert-reminder b{display:block;font:600 14px Chivo;color:#7a231d}
+.cert-reminder span{display:block;color:#9a4a43;font-size:12px;margin-top:3px}
+.cert-reminder-pills{display:flex;gap:8px;flex-wrap:wrap;align-self:center}
+.cert-pill{display:inline-flex;align-items:center;gap:4px;border:1px solid #e39b93;background:#fff;color:#a3352c;padding:7px 12px;font:600 11px 'IBM Plex Sans';cursor:pointer;transition:transform .2s,background .2s}
+.cert-pill:hover{background:#fde4e2;transform:translateY(-1px)}
 @media(max-width:700px){.mapping-grid{grid-template-columns:1fr}}
+@media(max-width:900px){.cert-reminder{flex-direction:column}.cert-reminder-pills{margin-left:0}}
 .modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:24px 28px 16px;border-bottom:1px solid var(--line)}
 .modal-head h2{font:600 22px Chivo;margin:6px 0 0}
 .modal-body{padding:24px 28px 28px}

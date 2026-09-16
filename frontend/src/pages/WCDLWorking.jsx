@@ -6,13 +6,14 @@ import { BankCertificate } from "../components/BankCertificate";
 import { api, errorText } from "../lib/api";
 import { rupee, money, pct, fmtDate, monthLong, today } from "../lib/format";
 
-export default function WCDLWorking({ facilities, month, onAction, refreshAll }) {
+export default function WCDLWorking({ facilities, month, onAction, refreshAll, focusFacilityId }) {
   const wcdlFacilities = facilities.filter((f) => f.type === "WCDL");
   const [facilityId, setFacilityId] = useState("");
   const [working, setWorking] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const load = () => api.get("/wcdl-working", { params: { month, ...(facilityId ? { facility_id: facilityId } : {}) } }).then((r) => setWorking(r.data)).catch((e) => onAction(errorText(e)));
   useEffect(() => { load(); }, [facilityId, month]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (focusFacilityId) setFacilityId(focusFacilityId); }, [focusFacilityId]);
   const remove = async (id) => {
     try { await api.delete(`/wcdl-loans/${id}`); onAction("Loan removed"); load(); refreshAll(); } catch (e) { onAction(errorText(e)); }
   };

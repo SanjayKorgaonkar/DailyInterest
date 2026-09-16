@@ -1,4 +1,4 @@
-import { Upload } from "lucide-react";
+import { AlertTriangle, ChevronRight, Upload } from "lucide-react";
 import { Header } from "../components/Header";
 import { money, rupee, monthLong, pct } from "../lib/format";
 
@@ -10,11 +10,29 @@ export default function Dashboard({ data, onNavigate, month }) {
     ["Current outstanding", money(d.outstanding), `${pct(d.utilisation)} utilisation`, "orange"],
     ["Available limit", money(d.available), `${(100 - d.utilisation).toFixed(1)}% headroom`, "green"],
   ];
+  const pending = d.pending_certificates || [];
   return (
     <>
       <Header eyebrow={`CONTROL CENTRE · ${monthLong(month).toUpperCase()}`} title="Good morning, Ankit" sub="Here’s the position across your working capital facilities.">
         <button className="primary" data-testid="add-facility-button" onClick={() => onNavigate("facilities")}>+ Add facility</button>
       </Header>
+      {pending.length > 0 && (
+        <div className="cert-reminder" data-testid="pending-certificates-banner">
+          <AlertTriangle size={18} />
+          <div>
+            <b>{pending.length} facilit{pending.length === 1 ? "y" : "ies"} missing a bank certificate for {monthLong(d.pending_month)}</b>
+            <span>Enter last month's bank-charged interest so reconciliation is complete before you close the books.</span>
+          </div>
+          <div className="cert-reminder-pills">
+            {pending.map((p) => (
+              <button key={p.facility_id} className="cert-pill" data-testid={`pending-cert-${p.facility_id}`}
+                onClick={() => onNavigate(p.type === "CC" ? "cc" : "wcdl", { facilityId: p.facility_id, month: p.month })}>
+                {p.bank} <ChevronRight size={12} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="metric-grid">
         {metrics.map((x, i) => (
           <div className={`metric ${x[3]}`} key={x[0]} data-testid={`metric-${i}`}><span>{x[0]}</span><strong>{x[1]}</strong><small>{x[2]}</small></div>

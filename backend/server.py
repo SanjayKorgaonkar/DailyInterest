@@ -10,7 +10,7 @@ from typing import Optional, Literal, List, Dict, Any
 import uuid
 from datetime import datetime, timezone, date
 
-from engine import cc_rows, wcdl_rows, cc_balance_at, wcdl_outstanding_at, rate_on, month_bounds, fy_start
+from engine import cc_rows, wcdl_rows, cc_balance_at, wcdl_outstanding_at, rate_on, month_bounds, fy_start, prev_month
 from seed import seed_if_empty
 from import_utils import parse_statement_file, guess_mapping, normalize_rows
 
@@ -366,6 +366,23 @@ async def dashboard(month: Optional[str] = None):
         cursor = month_bounds(m)[1]
     month_ours = round(this["cc_ours"] + this["wcdl_ours"], 2)
     month_bank = round(this["cc_bank"] + this["wcdl_bank"], 2)
+    pm = prev_month()
+    pending = []
+    for fac in facs:
+        cert = await get_certificate_amount(fac["id"], pm)
+        if cert is not None:
+            continue
+        if fac["type"] == "CC":
+            txs = await db.cc_transactions.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
+            w = cc_rows(fac, txs, pm)
+            ours, bank = w["ours"], w["bank"]
+        else:
+            loans = await db.wcdl_loans.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
+            rows = wcdl_rows(fac, loans, pm)
+            ours = round(sum(r["interest"] for r in rows), 2)
+            bank = round(sum(r["bank"] or 0 for r in rows), 2)
+        if ours > 0 and bank <= 0:
+            pending.append({"facility_id": fac["id"], "bank": fac["bank"], "name": fac["name"], "type": fac["type"], "month": pm, "ours": ours})
     return {
         "month": month, "facilities": len(facs), "banks": len({f["bank"] for f in facs}),
         "limit": total_limit, "outstanding": total_out, "available": round(total_limit - total_out, 2),
@@ -373,6 +390,7 @@ async def dashboard(month: Optional[str] = None):
         "month_interest": month_ours, "month_bank_interest": month_bank, "ytd_interest": round(ytd_ours, 2),
         "variance": round(month_bank - month_ours, 2),
         "rate_changes": sum(max(len(f.get("rate_history", [])) - 1, 0) for f in facs),
+        "pending_certificates": pending, "pending_month": pm,
     }
 
 

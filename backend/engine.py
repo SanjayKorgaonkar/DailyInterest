@@ -13,6 +13,12 @@ def fy_start(month: str):
     return date(y if m >= 4 else y - 1, 4, 1)
 
 
+def prev_month():
+    y, m = date.today().year, date.today().month
+    py, pm = (y, m - 1) if m > 1 else (y - 1, 12)
+    return f"{py:04d}-{pm:02d}"
+
+
 def d(s):
     return date.fromisoformat(s)
 
