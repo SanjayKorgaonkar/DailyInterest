@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 5 verified the new Dashboard 'month-end reminder' feature (pending_certificates banner + click-through pills) end-to-end. Backend: 5/5 new pytest cases pass (GET /api/dashboard now returns pending_certificates+pending_month; pending_month is independent of ?month=; each entry has {facility_id,bank,name,type,month,ours}; PUT /api/bank-certificates removes the facility from the list; DELETE re-adds it; and matches the spec conditions cert-absent AND ours>0 AND bank<=0). Frontend: coral banner (data-testid=pending-certificates-banner) renders correctly above the metric-grid with AlertTriangle icon, correct pluralised text ('2 facilities missing a bank certificate for August 2026'), and two pills (pending-cert-icici-cc / pending-cert-hdfc-cc). Clicking a CC pill correctly (a) highlights cc-navigation-button, (b) sets cc-facility-select to the target facility, (c) switches period-selector to 2026-08, and (d) shows the amber certificate-strip. Saving a certificate via UI (add-certificate-button -> certificate-amount-input=200000 -> save-certificate-button) shrinks the banner from 2->1 pills; after PUT-ing certs for both facilities the banner disappears entirely; after DELETE the banner and both pills return. Regression: seed data intact after test run (icici-cc outstanding=29,600,000; hdfc-cc outstanding=16,000,000). All test-created bank_certificates deleted via DELETE /api/bank-certificates/{facility_id}/{month}.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/wcdl-working (seed integrity)", "issue": "axis-wcdl facility has ZERO wcdl_loans in the database — the seeded WCDL-AX-2409 loan (drawdown 2026-04-01, amount 5,00,00,000, repayment 2026-09-28, bank_interest 361000 per seed.py) is missing. As a result GET /api/wcdl-working returns only 1 row (sbi-wcdl) for any month where axis should also be active (verified May/Jun 2026). This matches the exact data-loss pattern flagged in the agent-to-agent context note. This was NOT caused by iteration 5 (verified untouched by our tests — GET /api/wcdl-working?facility_id=axis-wcdl before we started already returned rows:[]). Existing regression test tests/test_backend_api.py::test_wcdl_working_june fails because of this (axis interest ₹3,49,315.07 not present). Because axis-wcdl has zero ours in prev_month, no WCDL pill was surfaced by pending_certificates so end-to-end WCDL pill click-through could not be exercised — but the frontend code path is identical (onNavigate(type==='CC'?'cc':'wcdl',...)) and shares the same tested reducer.", "priority": "CRITICAL"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "WCDL pill click-through", "issue": "Not exercised end-to-end because no WCDL facility currently has ours>0 in pending_month (2026-08). Root cause is the axis-wcdl seed-loan data loss above, not the feature. Once axis-wcdl loans are restored, a WCDL pill will appear and can be re-tested.", "affected_selectors": ["pending-cert-axis-wcdl","wcdl-facility-select","period-selector"]}
+    ],
+    "design_issues": [
+      {"screen": "Dashboard banner", "issues": ["Banner rendering is clean and coral-accented as spec'd; contrast good; positioned above metric-grid as required. Pre-existing dev-only hydration warning (span inside option) noted in iteration 4 still present but cosmetic."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_dashboard_pending.py", "/app/test_reports/pytest/iteration_5.xml"],
+  "action_items": [
+    "RESTORE axis-wcdl seed loan (WCDL-AX-2409, drawdown 2026-04-01, amount 5,00,00,000, repayment 2026-09-28, bank_interest 3,61,000). Recommended fix: add a tiny idempotent 'restore missing seed loan' step to seed.py that inserts any WCDL_LOANS whose facility_id has zero loans (per-facility idempotency instead of collection-level), OR ship a one-off script /app/scripts/restore_axis_wcdl.py. Existing seed_if_empty only fires when db.wcdl_loans is entirely empty, so once one loan is lost it will never be restored automatically.",
+    "After restoring, re-run tests/test_backend_api.py::test_wcdl_working_june (currently failing) and manually verify a WCDL pill appears in the Dashboard banner for 2026-08 for axis-wcdl and clicking it selects the facility in wcdl-facility-select and shows the certificate-strip."
+  ],
+  "critical_code_review_comments": [
+    "server.py dashboard(): fine as-is, but the FY-to-date loop calls month_totals(m) for every month since fy_start which each iterates all facilities and re-queries cc_transactions/wcdl_loans/bank_certificates. For Sep 2026 that's 6 months x 4 facilities x 3 collections = ~72 DB round-trips per dashboard hit. Consider batching or caching per-facility rows across months.",
+    "seed.py's seed_if_empty guards on db.wcdl_loans being globally empty, which is why the axis-wcdl loss above is not self-healing. Recommend per-facility idempotency: for each seeded loan, insert only if no wcdl_loans exist for that facility_id.",
+    "Dashboard.jsx banner correctly uses type==='CC' ? 'cc' : 'wcdl' for the router key — matches App.js go() contract. Consider aria-live='polite' on the banner for screen-reader announcement when it appears after data refresh.",
+    "prev_month() is derived from real system clock — good for correctness; tests using time-freezing (freezegun) could be added but not required now."
+  ],
+  "updated_files": ["/app/backend/tests/test_dashboard_pending.py"],
+  "success_rate": {"backend": "100% for new feature (5/5 new tests); 96% overall (24/25 pre-existing pass, 1 pre-existing test_wcdl_working_june fails due to missing axis-wcdl seed loan)", "frontend": "100% for pending-certificate feature"},
+  "test_credentials": "None required (no auth).",
+  "seed_data_creation": "Created and immediately deleted transient bank_certificates for (icici-cc,2026-08) and (hdfc-cc,2026-08). No facilities or cc_transactions/wcdl_loans were mutated. Verified icici-cc=29.6M and hdfc-cc=16M outstanding pre and post.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The pending_certificates feature is fully green. The ONLY outstanding blocker is that axis-wcdl has lost its seeded wcdl_loan row (WCDL-AX-2409) — this preceded iteration 5 (already gone at test start) and prevents the WCDL variant of the pill from being surfaced. Main agent should restore that seed loan (either by patching seed.py to be per-facility idempotent or by running a one-off insert). After restore, manually verify pending_certificates for 2026-08 now includes an axis-wcdl entry (its August interest is > 0 per rate 8.50%/365 on 5cr principal) and that clicking pending-cert-axis-wcdl pill navigates to WCDL page with wcdl-facility-select set to axis-wcdl, period=2026-08, and the certificate-strip visible.",
+  "rca_of_the_issue": "axis-wcdl seed-loan absence RCA: seed.py's seed_if_empty checks `if not await db.wcdl_loans.count_documents({})` — this is collection-level idempotency. Once ANY wcdl_loan exists (sbi's does), the seeder never re-inserts axis'. Combined with a prior test/agent mutation that deleted axis-wcdl loans by facility_id (referenced in the agent-to-agent context note), the axis loan was permanently lost. Mitigation: change seeder to per-facility check, or add a maintenance endpoint / script for seed repair. Not a regression from iteration 5."
+}
