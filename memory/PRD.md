@@ -21,6 +21,7 @@ Create a desktop application for Banking Facility – CC & WCDL Interest Working
 - GET /api/facilities?month · POST /api/facilities · PUT /api/facilities/{id} (incl. day_count) · DELETE /api/facilities/{id}
 - POST /api/facilities/{id}/rates · DELETE /api/facilities/{id}/rates/{rid}
 - GET /api/cc-working?facility_id&month · POST /api/cc-transactions · DELETE /api/cc-transactions/{id}
+- POST /api/cc-transactions/import/parse (multipart file) · POST /api/cc-transactions/import/commit (facility_id, mapping, rows, dry_run)
 - GET /api/wcdl-working?facility_id&month · POST /api/wcdl-loans · DELETE /api/wcdl-loans/{id}
 - GET /api/dashboard?month · GET /api/reconciliation?month
 
@@ -32,16 +33,17 @@ Create a desktop application for Banking Facility – CC & WCDL Interest Working
 ## What's been implemented
 - 2026-09-16: Ledgerline workspace UI, navigation, Dashboard, Facility Master, CC/WCDL ledgers, reconciliation, reports (initially read-only mock data).
 - 2026-09-16 (this session): Real interest engine + MongoDB persistence; Facility CRUD; **Rate History** (effective-date rate changes with timeline drawer, add/delete, bps delta); **Actual/365 vs Actual/360** per-facility toggle; CC/WCDL rows auto-split at rate changes with "Rate change" segment rows; add/delete CC transactions and WCDL loans (with prepayment); month-driven dashboard & reconciliation; opening-balance rows for carried-forward months. Tested: iteration_2 (backend 11/11, frontend all flows pass).
+- 2026-09-16 (later same session): **Bank statement CSV/XLSX import** for CC transactions — `backend/import_utils.py` (pandas/openpyxl parsing + dateutil flexible dates + heuristic column-mapping guesser), `POST /api/cc-transactions/import/parse` and `/import/commit` (dry_run live preview), `StatementImportModal` in `CCWorking.jsx` (3-step upload → map → result flow with live preview on every mapping change, supports separate debit/credit columns OR a single amount column + Dr/Cr indicator). Tested: iteration_3 (backend 8/8 new pytest cases, frontend 100% of exercised flows — upload/map/preview/commit/result/done, XLSX, single-amount+DrCr, empty-file and no-date-column edge cases all pass).
 
 ## Prioritized backlog
-- P0: CSV/XLSX bank statement import with column mapping → cc_transactions (button currently shows toast only — MOCKED).
 - P1: Real Excel/PDF export for Reports and Reconciliation (buttons show toast only — MOCKED).
 - P1: Edit existing facility / transaction / loan inline.
 - P1: Rate change report (from rate_history) and monthly MIS.
 - P2: Other bank charges line in reconciliation.
 - P2: Package as Windows desktop executable; optional login.
+- P2 (minor, non-blocking): guess_mapping() column detection uses `elif` chaining — could miss a slot if an earlier header ambiguously matches; low risk with typical bank statement headers.
 
 ## Remaining next tasks
-1. Statement import (CSV/XLSX) with preview + mapping.
-2. Excel/PDF export.
-3. Edit forms for master/ledger rows.
+1. Excel/PDF export for Reports and Reconciliation.
+2. Edit forms for master/ledger rows.
+3. Rate-change report + monthly MIS.

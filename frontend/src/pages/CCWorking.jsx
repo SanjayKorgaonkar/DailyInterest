@@ -134,6 +134,7 @@ function StatementImportModal({ facilityId, onClose, onImported, onError }) {
   };
 
   const runPreview = async (nextMapping) => {
+    if (!nextMapping.date_col) { setPreview({ transactions: [], errors: [] }); return; }
     try {
       const r = await api.post("/cc-transactions/import/commit", { facility_id: facilityId, mapping: nextMapping, rows: rows.slice(0, 8), dry_run: true });
       setPreview(r.data);

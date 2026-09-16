@@ -1,0 +1,38 @@
+{
+  "summary": "Full backend + frontend testing of new Bank Statement CSV/XLSX import for CC transactions. Backend: 8/8 new pytest cases pass (auto-mapping, dry-run, commit+persistence, disabled-without-date, single-amount+DrCr, XLSX round-trip, empty file, WCDL rejection). Frontend: End-to-end upload -> map -> live-preview -> commit -> result -> done flow works; live-preview updates when mapping dropdowns change; commit button correctly disabled when date_col is empty; warnings message shown with skip count; single-amount + Dr/Cr column path correctly splits into debit/credit in preview; empty file keeps modal on upload step and surfaces a toast; Dashboard 'Start import' still navigates to CC Working (does not auto-open modal). Imported transactions immediately appear in CC ledger with correctly recalculated interest (₹1,432.19 total over 3 rows for icici-cc/May 2026, using 8.50% Actual/365). Regression: rate history + Actual/365 vs Actual/360 previously tested (iteration_2) still pass — not re-tested in depth per task instructions.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "All pages (dev overlay)", "issues": ["Pre-existing console hydration warning: '<span> cannot be a child of <option>' caused by x-ve-dynamic instrumentation. Cosmetic/dev-only, not from this feature."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_statement_import.py",
+    "/app/test_reports/pytest/import_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "import_utils.guess_mapping() is order-sensitive because it uses `elif` — once a column matches a slot it cannot back-fill later slots (e.g. if the first column matches DATE_KEYWORDS via 'value date', subsequent debit/credit columns still work but a stray misordered header could shadow later matches). Consider evaluating each slot with a separate loop for robustness.",
+    "parse_statement_file uses `engine='openpyxl'` only for .xlsx and default for .xls — pandas removed xlrd support for .xlsx by default; .xls support may fail on some environments. Non-blocking (openpyxl works for .xlsx which is the primary target).",
+    "import_commit uses status_code=201 even for dry_run and for the rejected-mapping case is 400 via HTTPException — consistent. But dry_run response is 201 which is arguably 200 semantics; minor.",
+    "Frontend runPreview posts the full mapping on every dropdown change with a 400 possible response (e.g. cleared date_col) — currently swallowed silently only for the effect firing after date is present; when user clears date_col a 400 is logged in console. Not user-visible but noisy. Consider skipping runPreview when !mapping.date_col.",
+    "StatementImportModal: after successful commit, does NOT clean up local state on re-open — but since the modal is unmounted on close (showImport toggled), this is fine."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_statement_import.py",
+    "/app/test_reports/iteration_3.json",
+    "/app/test_reports/pytest/import_results.xml"
+  ],
+  "success_rate": {"backend": "100% (8/8 new import tests; 11/11 prior tests untouched)", "frontend": "100% of exercised flows"},
+  "test_credentials": "None — app has no auth",
+  "seed_data_creation": "Created three transactions on icici-cc (2026-05-01, 2026-05-05, 2026-05-10) during frontend test then cleaned up via DELETE /api/cc-transactions/{id}. Verified icici-cc May 2026 ledger returns to empty (opening-balance-only) state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "New tests at /app/backend/tests/test_statement_import.py. Run with `REACT_APP_BACKEND_URL=$(grep REACT_APP_BACKEND_URL /app/frontend/.env|cut -d= -f2) pytest backend/tests/test_statement_import.py`. Import flow requires facility_id (icici-cc or hdfc-cc), a CSV/XLSX file, and a mapping with at least date_col. Live preview endpoint is POST /api/cc-transactions/import/commit with dry_run=true. The x-ve-dynamic dev-overlay hydration warning is pre-existing and unrelated.",
+  "rca_of_the_issue": "No blocking issues found this iteration."
+}
