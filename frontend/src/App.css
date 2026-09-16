@@ -9,7 +9,26 @@
 td.empty{text-align:center;color:var(--muted);padding:36px;white-space:normal}
 .overlay{position:fixed;inset:0;background:#0f172a80;backdrop-filter:blur(3px);display:grid;place-items:center;z-index:20;padding:20px;animation:fade .2s ease}
 .modal{background:#fff;width:100%;max-width:560px;max-height:92vh;overflow:auto;border-top:4px solid var(--blue);box-shadow:0 30px 60px #0f172a4d;animation:up .25s ease}
-.modal.wide{max-width:700px}
+.modal.wide{max-width:860px}
+.dropzone{border:2px dashed var(--line);background:#fbfdff;padding:48px 20px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;cursor:pointer;color:#3a4a63;transition:border-color .2s,background .2s}
+.dropzone:hover{border-color:var(--blue);background:#f3f7ff}
+.dropzone svg{color:var(--blue)}
+.dropzone b{font:600 15px Chivo}
+.dropzone span{color:var(--muted);font-size:12px;max-width:320px}
+.import-file-line{display:flex;align-items:center;gap:8px;font-size:12px;color:#5a6b82;background:#f4f7fb;border:1px solid var(--line);padding:9px 13px;margin-bottom:18px}
+.import-file-line svg{color:#d97706;flex-shrink:0}
+.mapping-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;margin-bottom:22px}
+.import-preview{margin-bottom:20px}
+.import-preview>b{display:block;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#66748a;margin-bottom:10px}
+.import-preview table{border:1px solid var(--line)}
+.import-preview th,.import-preview td{padding:9px 12px;font-size:11px}
+.import-warnings{margin-top:10px;font-size:11px;color:#b45309;background:#fff8e6;border:1px solid #f5df91;padding:9px 12px}
+.import-result{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:24px 10px}
+.import-result svg{color:var(--green)}
+.import-result b{font:600 17px Chivo}
+.import-result span{color:var(--muted);font-size:12px;max-width:380px}
+.import-result button{margin-top:10px}
+@media(max-width:700px){.mapping-grid{grid-template-columns:1fr}}
 .modal-head{display:flex;align-items:flex-start;justify-content:space-between;padding:24px 28px 16px;border-bottom:1px solid var(--line)}
 .modal-head h2{font:600 22px Chivo;margin:6px 0 0}
 .modal-body{padding:24px 28px 28px}

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Calculator, CornerDownRight, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Calculator, CheckCircle2, CornerDownRight, FileWarning, Trash2, Upload, UploadCloud } from "lucide-react";
 import { Header } from "../components/Header";
 import { Modal, Field } from "../components/Modal";
 import { api, errorText } from "../lib/api";
@@ -10,6 +10,7 @@ export default function CCWorking({ facilities, month, onAction, refreshAll }) {
   const [facilityId, setFacilityId] = useState(ccFacilities[0]?.id || "");
   const [working, setWorking] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   useEffect(() => { if (!facilityId && ccFacilities[0]) setFacilityId(ccFacilities[0].id); }, [ccFacilities, facilityId]);
   const load = () => { if (facilityId) api.get("/cc-working", { params: { facility_id: facilityId, month } }).then((r) => setWorking(r.data)).catch((e) => onAction(errorText(e))); };
   useEffect(load, [facilityId, month]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -24,7 +25,7 @@ export default function CCWorking({ facilities, month, onAction, refreshAll }) {
         <select className="fac-select" data-testid="cc-facility-select" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
           {ccFacilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}</option>)}
         </select>
-        <button className="outline" data-testid="import-working-button" onClick={() => onAction("Statement import arrives in the next release")}><Upload size={15} /> Import statement</button>
+        <button className="outline" data-testid="import-working-button" onClick={() => setShowImport(true)} disabled={!facilityId}><Upload size={15} /> Import statement</button>
         <button className="primary" data-testid="add-working-row-button" onClick={() => setShowForm(true)} disabled={!facilityId}>+ Add row</button>
       </Header>
       <div className="working-note">
@@ -61,6 +62,7 @@ export default function CCWorking({ facilities, month, onAction, refreshAll }) {
         </table>
       </div>
       {showForm && <TransactionForm facilityId={facilityId} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); onAction("Transaction added · interest recalculated"); load(); refreshAll(); }} onError={onAction} />}
+      {showImport && <StatementImportModal facilityId={facilityId} onClose={() => setShowImport(false)} onImported={(n) => { setShowImport(false); onAction(`${n} transaction${n === 1 ? "" : "s"} imported · interest recalculated`); load(); refreshAll(); }} onError={onAction} />}
     </>
   );
 }
@@ -91,6 +93,130 @@ function TransactionForm({ facilityId, onClose, onSaved, onError }) {
           <button type="submit" className="primary" disabled={saving} data-testid="cc-form-submit-button">{saving ? "Saving…" : "Add transaction"}</button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+const MAPPING_FIELDS = [
+  { key: "date_col", label: "Transaction date column", required: true },
+  { key: "value_date_col", label: "Value date column", hint: "Defaults to transaction date" },
+  { key: "debit_col", label: "Debit / withdrawal column" },
+  { key: "credit_col", label: "Credit / deposit column" },
+  { key: "amount_col", label: "Single amount column", hint: "Use instead of separate debit/credit columns" },
+  { key: "dr_cr_col", label: "Dr / Cr indicator column", hint: "Optional · used with single amount column" },
+  { key: "narration_col", label: "Narration / description column" },
+  { key: "bank_interest_col", label: "Bank charged interest column", hint: "Optional · for reconciliation" },
+];
+
+function StatementImportModal({ facilityId, onClose, onImported, onError }) {
+  const [step, setStep] = useState("upload");
+  const [busy, setBusy] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [columns, setColumns] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [preview, setPreview] = useState(null);
+  const [result, setResult] = useState(null);
+  const fileInput = useRef(null);
+
+  const upload = async (file) => {
+    setBusy(true);
+    setFileName(file.name);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await api.post("/cc-transactions/import/parse", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setColumns(r.data.columns);
+      setRows(r.data.rows);
+      setMapping(r.data.mapping);
+      setStep("map");
+    } catch (e) { onError(errorText(e)); } finally { setBusy(false); }
+  };
+
+  const runPreview = async (nextMapping) => {
+    try {
+      const r = await api.post("/cc-transactions/import/commit", { facility_id: facilityId, mapping: nextMapping, rows: rows.slice(0, 8), dry_run: true });
+      setPreview(r.data);
+    } catch (e) { onError(errorText(e)); }
+  };
+
+  useEffect(() => { if (step === "map" && rows.length) runPreview(mapping); }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const setField = (key) => (e) => {
+    const next = { ...mapping, [key]: e.target.value || null };
+    setMapping(next);
+    runPreview(next);
+  };
+
+  const commit = async () => {
+    setBusy(true);
+    try {
+      const r = await api.post("/cc-transactions/import/commit", { facility_id: facilityId, mapping, rows, dry_run: false });
+      setResult(r.data);
+      setStep("result");
+    } catch (e) { onError(errorText(e)); } finally { setBusy(false); }
+  };
+
+  return (
+    <Modal title="Import bank statement" eyebrow="CC LEDGER · CSV / XLSX" onClose={onClose} testId="import-statement-modal" wide>
+      {step === "upload" && (
+        <div className="dropzone" data-testid="import-dropzone" onClick={() => fileInput.current?.click()}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) upload(f); }}>
+          <UploadCloud size={28} />
+          <b>{busy ? "Reading file…" : "Click or drop a CSV / XLSX statement"}</b>
+          <span>Columns are auto-detected — you can adjust the mapping on the next step.</span>
+          <input ref={fileInput} type="file" hidden accept=".csv,.xlsx,.xls" data-testid="import-file-input"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
+        </div>
+      )}
+      {step === "map" && (
+        <div data-testid="import-mapping-step">
+          <div className="import-file-line"><FileWarning size={14} /> {fileName} · {rows.length} row{rows.length === 1 ? "" : "s"} detected</div>
+          <div className="mapping-grid">
+            {MAPPING_FIELDS.map((f) => (
+              <Field key={f.key} label={f.required ? `${f.label} *` : f.label} hint={f.hint}>
+                <select data-testid={`import-map-${f.key}`} value={mapping[f.key] || ""} onChange={setField(f.key)}>
+                  <option value="">— none —</option>
+                  {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </Field>
+            ))}
+          </div>
+          <div className="import-preview">
+            <b>Preview (first {preview?.transactions?.length || 0} rows)</b>
+            <table>
+              <thead><tr><th>Date</th><th>Value date</th><th>Debit</th><th>Credit</th><th>Narration</th></tr></thead>
+              <tbody>
+                {(preview?.transactions || []).map((t, i) => (
+                  <tr key={i} data-testid="import-preview-row">
+                    <td>{fmtDate(t.date)}</td><td>{fmtDate(t.value_date)}</td>
+                    <td className="mono">{t.debit ? rupee(t.debit) : "—"}</td>
+                    <td className="mono positive">{t.credit ? rupee(t.credit) : "—"}</td>
+                    <td>{t.narration}</td>
+                  </tr>
+                ))}
+                {preview && preview.transactions.length === 0 && <tr><td colSpan={5} className="empty">No valid rows with this mapping — adjust the columns above.</td></tr>}
+              </tbody>
+            </table>
+            {preview?.errors?.length > 0 && <div className="import-warnings" data-testid="import-warnings">{preview.errors.length} row(s) will be skipped, e.g. {preview.errors[0]}</div>}
+          </div>
+          <div className="form-actions">
+            <button type="button" className="outline" onClick={onClose} data-testid="import-cancel-button">Cancel</button>
+            <button type="button" className="primary" disabled={busy || !mapping.date_col} onClick={commit} data-testid="import-commit-button">
+              {busy ? "Importing…" : `Import ${rows.length} row${rows.length === 1 ? "" : "s"}`}
+            </button>
+          </div>
+        </div>
+      )}
+      {step === "result" && result && (
+        <div className="import-result" data-testid="import-result">
+          <CheckCircle2 size={30} />
+          <b data-testid="import-result-inserted">{result.inserted} transaction{result.inserted === 1 ? "" : "s"} imported</b>
+          {result.skipped > 0 && <span>{result.skipped} row(s) skipped — {result.errors.slice(0, 3).join("; ")}</span>}
+          <button type="button" className="primary" onClick={() => onImported(result.inserted)} data-testid="import-done-button">Done</button>
+        </div>
+      )}
     </Modal>
   );
 }

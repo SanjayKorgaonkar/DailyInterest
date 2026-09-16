@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,12 +6,13 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from typing import Optional, Literal, List, Dict, Any
 import uuid
 from datetime import datetime, timezone, date
 
 from engine import cc_rows, wcdl_rows, cc_balance_at, wcdl_outstanding_at, rate_on, month_bounds, fy_start
 from seed import seed_if_empty
+from import_utils import parse_statement_file, guess_mapping, normalize_rows
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -69,6 +70,13 @@ class CCTransactionIn(BaseModel):
     credit: float = 0
     bank_interest: Optional[float] = None
     narration: str = ""
+
+
+class ImportCommitIn(BaseModel):
+    facility_id: str
+    mapping: Dict[str, Optional[str]]
+    rows: List[Dict[str, Any]]
+    dry_run: bool = False
 
 
 class WCDLLoanIn(BaseModel):
@@ -214,6 +222,42 @@ async def delete_cc_transaction(tid: str):
     res = await db.cc_transactions.delete_one({"id": tid})
     if not res.deleted_count:
         raise HTTPException(404, "Transaction not found")
+
+
+@api_router.post("/cc-transactions/import/parse")
+async def import_parse(file: UploadFile = File(...)):
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "Uploaded file is empty")
+    try:
+        columns, rows = parse_statement_file(file.filename, content)
+    except Exception:
+        raise HTTPException(400, "Could not read this file. Upload a CSV or XLSX bank statement.")
+    if not columns or not rows:
+        raise HTTPException(400, "No rows found in this file")
+    mapping = guess_mapping(columns)
+    return {"columns": columns, "rows": rows, "row_count": len(rows), "mapping": mapping, "preview": rows[:10]}
+
+
+@api_router.post("/cc-transactions/import/commit", status_code=201)
+async def import_commit(body: ImportCommitIn):
+    fac = await get_facility(body.facility_id)
+    if fac["type"] != "CC":
+        raise HTTPException(400, "Statement import only applies to CC facilities")
+    if not body.mapping.get("date_col"):
+        raise HTTPException(400, "Map a transaction date column before importing")
+    txns, errors = normalize_rows(body.rows, body.mapping)
+    if body.dry_run:
+        return {"inserted": 0, "skipped": len(errors), "errors": errors[:25], "transactions": txns}
+    docs = []
+    for t in txns:
+        t.update({"facility_id": body.facility_id, "id": str(uuid.uuid4()), "created_at": now_iso()})
+        docs.append(t)
+    if docs:
+        await db.cc_transactions.insert_many(docs)
+    for d in docs:
+        d.pop("_id", None)
+    return {"inserted": len(docs), "skipped": len(errors), "errors": errors[:25], "transactions": docs}
 
 
 @api_router.get("/wcdl-working")
