@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import re
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -354,6 +355,8 @@ async def delete_bank_certificate(facility_id: str, month: str):
 @api_router.get("/reports/monthly-checklist")
 async def monthly_checklist(month: Optional[str] = None):
     month = month or prev_month()
+    if not re.match(r"^\d{4}-\d{2}$", month):
+        raise HTTPException(400, "month must be in YYYY-MM format")
     facs = await db.facilities.find({}, NO_ID).sort("created_at", 1).to_list(1000)
     rows = []
     total_ours = total_bank = 0.0

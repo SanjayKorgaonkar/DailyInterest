@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AlertTriangle, ChevronRight, FileDown, Upload } from "lucide-react";
 import { Header } from "../components/Header";
 import { money, rupee, monthLong, pct } from "../lib/format";
@@ -12,7 +13,10 @@ export default function Dashboard({ data, onNavigate, month, onAction }) {
     ["Available limit", money(d.available), `${(100 - d.utilisation).toFixed(1)}% headroom`, "green"],
   ];
   const pending = d.pending_certificates || [];
+  const [downloading, setDownloading] = useState(false);
   const downloadChecklist = async () => {
+    if (downloading) return;
+    setDownloading(true);
     try {
       const r = await api.get("/reports/monthly-checklist", { params: { month: d.pending_month }, responseType: "blob" });
       const url = window.URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }));
@@ -20,13 +24,13 @@ export default function Dashboard({ data, onNavigate, month, onAction }) {
       a.href = url; a.download = `reconciliation-checklist-${d.pending_month}.pdf`;
       document.body.appendChild(a); a.click(); a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (e) { onAction?.(errorText(e)); }
+    } catch (e) { onAction?.(errorText(e)); } finally { setDownloading(false); }
   };
   return (
     <>
       <Header eyebrow={`CONTROL CENTRE · ${monthLong(month).toUpperCase()}`} title="Good morning, Ankit" sub="Here’s the position across your working capital facilities.">
-        <button className="outline" data-testid="download-checklist-button" onClick={downloadChecklist}>
-          <FileDown size={15} /> {monthLong(d.pending_month)} checklist
+        <button className="outline" data-testid="download-checklist-button" disabled={downloading} onClick={downloadChecklist}>
+          <FileDown size={15} /> {downloading ? "Preparing…" : `${monthLong(d.pending_month)} checklist`}
         </button>
         <button className="primary" data-testid="add-facility-button" onClick={() => onNavigate("facilities")}>+ Add facility</button>
       </Header>
