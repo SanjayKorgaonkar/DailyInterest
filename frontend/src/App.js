@@ -27,6 +27,7 @@ function App() {
   const [month, setMonth] = useState(MONTHS[0]);
   const [jumpFacility, setJumpFacility] = useState(null);
   const [toast, setToast] = useState("");
+  const pendingCount = data.dashboard.pending_certificates?.length || 0;
   const action = (text) => { setToast(text); setTimeout(() => setToast(""), 2800); };
   const reload = useCallback(() => {
     Promise.all(["dashboard", "facilities", "reconciliation"].map((k) => api.get(`/${k}`, { params: { month } }).then((r) => r.data)))
@@ -52,7 +53,9 @@ function App() {
         <nav>
           {NAV.map((n) => (
             <button key={n.id} data-testid={`${n.id}-navigation-button`} className={page === n.id ? "nav-item active" : "nav-item"} onClick={() => go(n.id)}>
-              <n.icon size={17} /><span>{n.label}</span>{page === n.id && <ChevronRight size={15} />}
+              <n.icon size={17} /><span>{n.label}</span>
+              {n.id === "dashboard" && pendingCount > 0 && <span className="nav-badge" data-testid="pending-count-badge">{pendingCount}</span>}
+              {page === n.id && <ChevronRight size={15} />}
             </button>
           ))}
         </nav>
