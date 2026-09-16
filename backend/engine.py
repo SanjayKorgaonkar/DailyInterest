@@ -65,6 +65,7 @@ def cc_rows(facility, transactions, month):
             segs.append({"from": a.isoformat(), "to": b.isoformat(), "rate": r, "days": days, "interest": interest(max(balance, 0), r, days, day_count)})
         ours = round(sum(s["interest"] for s in segs), 2)
         bank = t.get("bank_interest")
+        auto_matched = bool(t.get("auto_matched")) and not t.get("opening")
         for j, s in enumerate(segs):
             rows.append({
                 "id": t["id"], "segment": j > 0, "opening": bool(t.get("opening")),
@@ -72,6 +73,7 @@ def cc_rows(facility, transactions, month):
                 "debit": t["debit"] if j == 0 else 0, "credit": t["credit"] if j == 0 else 0,
                 "closing": balance, "days": s["days"], "rate": s["rate"], "interest": s["interest"],
                 "bank": bank if j == 0 else None,
+                "auto_matched": auto_matched if j == 0 else False,
                 "difference": round(bank - ours, 2) if (j == 0 and bank is not None) else None,
                 "rate_changed": j > 0,
             })

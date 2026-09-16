@@ -14,6 +14,8 @@ AMOUNT_KEYWORDS = ["amount", "amt"]
 DRCR_KEYWORDS = ["dr/cr", "dr / cr", "type", "indicator", "cr/dr"]
 NARRATION_KEYWORDS = ["narration", "description", "particulars", "remarks", "details"]
 INTEREST_KEYWORDS = ["interest"]
+INTEREST_NARRATION_MARKERS = ["interest debited", "int debited", "interest chgd", "int chgd", "interest charged",
+                              "int charged", "interest chg", "int.chrg", "int chrg", "interest debit", "int deb"]
 
 
 def _match(col: str, keywords) -> bool:
@@ -131,12 +133,22 @@ def normalize_rows(rows, mapping):
             errors.append(f"Row {idx}: no debit or credit amount — skipped")
             continue
 
+        narration = str(row.get(narration_col, "")).strip() if narration_col else ""
+        bank_interest = to_float(row.get(interest_col)) if interest_col and str(row.get(interest_col, "")).strip() else None
+        auto_matched = False
+        if bank_interest is None and debit > 0 and narration:
+            low = narration.lower()
+            if "interest" in low or any(m in low for m in INTEREST_NARRATION_MARKERS):
+                bank_interest = debit
+                auto_matched = True
+
         txns.append({
             "date": txn_date,
             "value_date": value_date,
             "debit": round(debit, 2),
             "credit": round(credit, 2),
-            "bank_interest": to_float(row.get(interest_col)) if interest_col and str(row.get(interest_col, "")).strip() else None,
-            "narration": str(row.get(narration_col, "")).strip() if narration_col else "",
+            "bank_interest": bank_interest,
+            "auto_matched": auto_matched,
+            "narration": narration,
         })
     return txns, errors

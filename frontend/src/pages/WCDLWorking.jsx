@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Calculator, CornerDownRight, Trash2 } from "lucide-react";
 import { Header } from "../components/Header";
 import { Modal, Field } from "../components/Modal";
+import { BankCertificate } from "../components/BankCertificate";
 import { api, errorText } from "../lib/api";
 import { rupee, money, pct, fmtDate, monthLong, today } from "../lib/format";
 
@@ -31,6 +32,7 @@ export default function WCDLWorking({ facilities, month, onAction, refreshAll })
         <span><b>Formula active:</b> Principal × applicable rate × days ÷ day-count (per facility)</span>
         <span className="note-right" data-testid="wcdl-convention-note">{conventions.map((c) => `Actual / ${c}`).join(" · ") || "Actual / 365"}</span>
       </div>
+      {facilityId && <BankCertificate facilityId={facilityId} month={month} calculated={working?.calculated_bank || 0} onChanged={() => { load(); refreshAll(); }} onError={onAction} />}
       <div className="table-wrap">
         <div className="table-toolbar">
           <b>WCDL loan ledger · {monthLong(month)}</b>

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Calculator, CheckCircle2, CornerDownRight, FileWarning, Trash2, Upload, UploadCloud } from "lucide-react";
+import { BadgeCheck, Calculator, CheckCircle2, CornerDownRight, FileWarning, Trash2, Upload, UploadCloud } from "lucide-react";
 import { Header } from "../components/Header";
 import { Modal, Field } from "../components/Modal";
+import { BankCertificate } from "../components/BankCertificate";
 import { api, errorText } from "../lib/api";
 import { rupee, pct, fmtDate, monthLong, today } from "../lib/format";
 
@@ -33,6 +34,7 @@ export default function CCWorking({ facilities, month, onAction, refreshAll }) {
         <span><b>Formula active:</b> Closing outstanding × applicable rate × days ÷ {working?.day_count || 365}</span>
         <span className="note-right" data-testid="cc-convention-note">{fac ? `Actual / ${fac.day_count} · ${fac.rate_history.length} rate${fac.rate_history.length === 1 ? "" : "s"} on file` : "Value date basis"}</span>
       </div>
+      {facilityId && <BankCertificate facilityId={facilityId} month={month} calculated={working?.calculated_bank || 0} onChanged={() => { load(); refreshAll(); }} onError={onAction} />}
       <div className="table-wrap">
         <div className="table-toolbar">
           <b>CC transaction ledger · {monthLong(month)}</b>
@@ -53,7 +55,7 @@ export default function CCWorking({ facilities, month, onAction, refreshAll }) {
                 <td className="mono">{r.days}</td>
                 <td className="mono">{r.segment ? <span className="rate-pill">{pct(r.rate)}</span> : pct(r.rate)}</td>
                 <td className="mono">{rupee(r.interest)}</td>
-                <td className="mono">{r.bank == null ? "—" : rupee(r.bank)}</td>
+                <td className="mono">{r.bank == null ? "—" : <>{rupee(r.bank)}{r.auto_matched && <span className="auto-badge" data-testid={`cc-auto-matched-${r.id}`}><BadgeCheck size={10} /> Auto</span>}</>}</td>
                 <td className={`mono ${r.difference > 0 ? "danger-text" : "positive"}`}>{r.difference == null ? "—" : `${r.difference > 0 ? "+" : ""}${rupee(r.difference)}`}</td>
                 <td>{!r.segment && !r.opening && <button className="icon-btn" data-testid={`delete-cc-${r.id}`} aria-label="Delete" onClick={() => remove(r.id)}><Trash2 size={14} /></button>}</td>
               </tr>
@@ -187,7 +189,7 @@ function StatementImportModal({ facilityId, onClose, onImported, onError }) {
           <div className="import-preview">
             <b>Preview (first {preview?.transactions?.length || 0} rows)</b>
             <table>
-              <thead><tr><th>Date</th><th>Value date</th><th>Debit</th><th>Credit</th><th>Narration</th></tr></thead>
+              <thead><tr><th>Date</th><th>Value date</th><th>Debit</th><th>Credit</th><th>Narration</th><th>Bank interest</th></tr></thead>
               <tbody>
                 {(preview?.transactions || []).map((t, i) => (
                   <tr key={i} data-testid="import-preview-row">
@@ -195,9 +197,10 @@ function StatementImportModal({ facilityId, onClose, onImported, onError }) {
                     <td className="mono">{t.debit ? rupee(t.debit) : "—"}</td>
                     <td className="mono positive">{t.credit ? rupee(t.credit) : "—"}</td>
                     <td>{t.narration}</td>
+                    <td className="mono">{t.bank_interest == null ? "—" : <>{rupee(t.bank_interest)}{t.auto_matched && <span className="auto-badge" data-testid="import-auto-matched-badge"><BadgeCheck size={10} /> Auto</span>}</>}</td>
                   </tr>
                 ))}
-                {preview && preview.transactions.length === 0 && <tr><td colSpan={5} className="empty">No valid rows with this mapping — adjust the columns above.</td></tr>}
+                {preview && preview.transactions.length === 0 && <tr><td colSpan={6} className="empty">No valid rows with this mapping — adjust the columns above.</td></tr>}
               </tbody>
             </table>
             {preview?.errors?.length > 0 && <div className="import-warnings" data-testid="import-warnings">{preview.errors.length} row(s) will be skipped, e.g. {preview.errors[0]}</div>}

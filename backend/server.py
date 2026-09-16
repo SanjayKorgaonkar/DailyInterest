@@ -90,6 +90,12 @@ class WCDLLoanIn(BaseModel):
     bank_interest: Optional[float] = None
 
 
+class CertificateIn(BaseModel):
+    facility_id: str
+    month: str
+    amount: float = Field(ge=0)
+
+
 async def get_facility(fid: str):
     fac = await db.facilities.find_one({"id": fid}, NO_ID)
     if not fac:
@@ -110,20 +116,26 @@ async def decorate(fac, end: date):
     return fac
 
 
+async def get_certificate_amount(facility_id: str, month: str):
+    cert = await db.bank_certificates.find_one({"facility_id": facility_id, "month": month}, NO_ID)
+    return cert["amount"] if cert else None
+
+
 async def month_totals(month: str):
     facs = await db.facilities.find({}, NO_ID).to_list(1000)
     cc_ours = cc_bank = wcdl_ours = wcdl_bank = 0.0
     for fac in facs:
+        cert = await get_certificate_amount(fac["id"], month)
         if fac["type"] == "CC":
             txs = await db.cc_transactions.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
             w = cc_rows(fac, txs, month)
             cc_ours += w["ours"]
-            cc_bank += w["bank"]
+            cc_bank += cert if cert is not None else w["bank"]
         else:
             loans = await db.wcdl_loans.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
             rows = wcdl_rows(fac, loans, month)
             wcdl_ours += sum(r["interest"] for r in rows)
-            wcdl_bank += sum(r["bank"] or 0 for r in rows)
+            wcdl_bank += cert if cert is not None else sum(r["bank"] or 0 for r in rows)
     return {"cc_ours": round(cc_ours, 2), "cc_bank": round(cc_bank, 2), "wcdl_ours": round(wcdl_ours, 2), "wcdl_bank": round(wcdl_bank, 2)}
 
 
@@ -197,6 +209,12 @@ async def cc_working(facility_id: Optional[str] = None, month: Optional[str] = N
             return {"facility": None, "rows": [], "ours": 0, "bank": 0, "difference": 0, "opening": 0, "closing": 0, "day_count": 365}
     txs = await db.cc_transactions.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
     result = cc_rows(fac, txs, month)
+    result["calculated_bank"] = result["bank"]
+    cert = await get_certificate_amount(fac["id"], month)
+    if cert is not None:
+        result["bank"] = cert
+        result["difference"] = round(result["bank"] - result["ours"], 2)
+    result["certificate"] = cert
     result["facility"] = await decorate(fac, month_bounds(month)[1])
     result["month"] = month
     return result
@@ -267,15 +285,24 @@ async def wcdl_working(facility_id: Optional[str] = None, month: Optional[str] =
     if facility_id:
         query["id"] = facility_id
     facs = await db.facilities.find(query, NO_ID).sort("created_at", 1).to_list(1000)
-    rows = []
+    rows, certificates = [], {}
+    bank = 0.0
     for fac in facs:
         loans = await db.wcdl_loans.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
-        for r in wcdl_rows(fac, loans, month):
+        fac_rows = wcdl_rows(fac, loans, month)
+        for r in fac_rows:
             r["day_count"] = int(fac.get("day_count", 365))
-            rows.append(r)
+        rows += fac_rows
+        cert = await get_certificate_amount(fac["id"], month)
+        fac_bank = sum(r["bank"] or 0 for r in fac_rows)
+        if cert is not None:
+            certificates[fac["id"]] = cert
+        bank += cert if cert is not None else fac_bank
     ours = round(sum(r["interest"] for r in rows), 2)
-    bank = round(sum(r["bank"] or 0 for r in rows), 2)
-    return {"rows": rows, "ours": ours, "bank": bank, "variance": round(bank - ours, 2), "month": month}
+    calculated_bank = round(sum(r["bank"] or 0 for r in rows), 2)
+    bank = round(bank, 2)
+    return {"rows": rows, "ours": ours, "bank": bank, "calculated_bank": calculated_bank,
+            "certificates": certificates, "variance": round(bank - ours, 2), "month": month}
 
 
 @api_router.post("/wcdl-loans", status_code=201)
@@ -297,6 +324,29 @@ async def delete_wcdl_loan(lid: str):
     res = await db.wcdl_loans.delete_one({"id": lid})
     if not res.deleted_count:
         raise HTTPException(404, "Loan not found")
+
+
+@api_router.get("/bank-certificates")
+async def get_bank_certificate(facility_id: str, month: str):
+    return await db.bank_certificates.find_one({"facility_id": facility_id, "month": month}, NO_ID)
+
+
+@api_router.put("/bank-certificates")
+async def upsert_bank_certificate(body: CertificateIn):
+    await get_facility(body.facility_id)
+    now = now_iso()
+    await db.bank_certificates.update_one(
+        {"facility_id": body.facility_id, "month": body.month},
+        {"$set": {"amount": body.amount, "updated_at": now},
+         "$setOnInsert": {"id": str(uuid.uuid4()), "facility_id": body.facility_id, "month": body.month, "created_at": now}},
+        upsert=True,
+    )
+    return await db.bank_certificates.find_one({"facility_id": body.facility_id, "month": body.month}, NO_ID)
+
+
+@api_router.delete("/bank-certificates/{facility_id}/{month}", status_code=204)
+async def delete_bank_certificate(facility_id: str, month: str):
+    await db.bank_certificates.delete_one({"facility_id": facility_id, "month": month})
 
 
 @api_router.get("/dashboard")
