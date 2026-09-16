@@ -9,7 +9,7 @@ import CCWorking from "./pages/CCWorking";
 import WCDLWorking from "./pages/WCDLWorking";
 import { Reconciliation, Reports } from "./pages/Reports";
 
-const EMPTY = { dashboard: { facilities: 0, banks: 0, limit: 0, outstanding: 0, available: 0, utilisation: 0, month_interest: 0, month_bank_interest: 0, ytd_interest: 0, variance: 0, rate_changes: 0 }, facilities: [], recon: [] };
+const EMPTY = { dashboard: { facilities: 0, banks: 0, limit: 0, outstanding: 0, available: 0, utilisation: 0, month_interest: 0, month_bank_interest: 0, ytd_interest: 0, variance: 0, rate_changes: 0, pending_certificates: [], pending_month: new Date().toISOString().slice(0, 7) }, facilities: [], recon: [] };
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "facilities", label: "Facility Master", icon: Building2 },
@@ -75,7 +75,7 @@ function App() {
           </div>
         </header>
         <section className="content">
-          {page === "dashboard" && <Dashboard data={data} onNavigate={go} month={month} />}
+          {page === "dashboard" && <Dashboard data={data} onNavigate={go} month={month} onAction={action} />}
           {page === "facilities" && <Facilities data={data.facilities} onAction={action} reload={reload} />}
           {page === "cc" && <CCWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} />}
           {page === "wcdl" && <WCDLWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} />}

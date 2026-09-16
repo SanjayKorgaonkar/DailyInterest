@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -13,6 +14,7 @@ from datetime import datetime, timezone, date
 from engine import cc_rows, wcdl_rows, cc_balance_at, wcdl_outstanding_at, rate_on, month_bounds, fy_start, prev_month
 from seed import seed_if_empty
 from import_utils import parse_statement_file, guess_mapping, normalize_rows
+from reports import build_monthly_checklist_pdf
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -347,6 +349,35 @@ async def upsert_bank_certificate(body: CertificateIn):
 @api_router.delete("/bank-certificates/{facility_id}/{month}", status_code=204)
 async def delete_bank_certificate(facility_id: str, month: str):
     await db.bank_certificates.delete_one({"facility_id": facility_id, "month": month})
+
+
+@api_router.get("/reports/monthly-checklist")
+async def monthly_checklist(month: Optional[str] = None):
+    month = month or prev_month()
+    facs = await db.facilities.find({}, NO_ID).sort("created_at", 1).to_list(1000)
+    rows = []
+    total_ours = total_bank = 0.0
+    for fac in facs:
+        cert = await get_certificate_amount(fac["id"], month)
+        if fac["type"] == "CC":
+            txs = await db.cc_transactions.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
+            w = cc_rows(fac, txs, month)
+            ours, calc_bank = w["ours"], w["bank"]
+        else:
+            loans = await db.wcdl_loans.find({"facility_id": fac["id"]}, NO_ID).to_list(10000)
+            wrows = wcdl_rows(fac, loans, month)
+            ours = round(sum(r["interest"] for r in wrows), 2)
+            calc_bank = round(sum(r["bank"] or 0 for r in wrows), 2)
+        bank_amount = cert if cert is not None else calc_bank
+        status = "Certified" if cert is not None else ("Auto-matched" if calc_bank > 0 else "Needs review")
+        rows.append({"bank": fac["bank"], "name": fac["name"], "type": fac["type"],
+                     "ours": ours, "bank_amount": bank_amount, "variance": round(bank_amount - ours, 2), "status": status})
+        total_ours += ours
+        total_bank += bank_amount
+    totals = {"ours": round(total_ours, 2), "bank": round(total_bank, 2), "variance": round(total_bank - total_ours, 2)}
+    pdf_bytes = build_monthly_checklist_pdf(month, rows, totals)
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="reconciliation-checklist-{month}.pdf"'})
 
 
 @api_router.get("/dashboard")

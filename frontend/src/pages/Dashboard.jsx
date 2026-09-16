@@ -1,8 +1,9 @@
-import { AlertTriangle, ChevronRight, Upload } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileDown, Upload } from "lucide-react";
 import { Header } from "../components/Header";
 import { money, rupee, monthLong, pct } from "../lib/format";
+import { api, errorText } from "../lib/api";
 
-export default function Dashboard({ data, onNavigate, month }) {
+export default function Dashboard({ data, onNavigate, month, onAction }) {
   const d = data.dashboard;
   const metrics = [
     ["Total facilities", d.facilities, `Across ${d.banks} banks`, "blue"],
@@ -11,9 +12,22 @@ export default function Dashboard({ data, onNavigate, month }) {
     ["Available limit", money(d.available), `${(100 - d.utilisation).toFixed(1)}% headroom`, "green"],
   ];
   const pending = d.pending_certificates || [];
+  const downloadChecklist = async () => {
+    try {
+      const r = await api.get("/reports/monthly-checklist", { params: { month: d.pending_month }, responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = `reconciliation-checklist-${d.pending_month}.pdf`;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) { onAction?.(errorText(e)); }
+  };
   return (
     <>
       <Header eyebrow={`CONTROL CENTRE · ${monthLong(month).toUpperCase()}`} title="Good morning, Ankit" sub="Here’s the position across your working capital facilities.">
+        <button className="outline" data-testid="download-checklist-button" onClick={downloadChecklist}>
+          <FileDown size={15} /> {monthLong(d.pending_month)} checklist
+        </button>
         <button className="primary" data-testid="add-facility-button" onClick={() => onNavigate("facilities")}>+ Add facility</button>
       </Header>
       {pending.length > 0 && (
