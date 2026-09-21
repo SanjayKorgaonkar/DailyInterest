@@ -75,6 +75,15 @@ class CCTransactionIn(BaseModel):
     narration: str = ""
 
 
+class CCTransactionUpdate(BaseModel):
+    date: Optional[str] = None
+    value_date: Optional[str] = None
+    debit: Optional[float] = Field(default=None, ge=0)
+    credit: Optional[float] = Field(default=None, ge=0)
+    bank_interest: Optional[float] = None
+    narration: Optional[str] = None
+
+
 class ImportCommitIn(BaseModel):
     facility_id: str
     mapping: Dict[str, Optional[str]]
@@ -89,6 +98,16 @@ class WCDLLoanIn(BaseModel):
     amount: float = Field(gt=0)
     repayment: str
     prepayment: float = 0
+    prepayment_date: Optional[str] = None
+    bank_interest: Optional[float] = None
+
+
+class WCDLLoanUpdate(BaseModel):
+    loan: Optional[str] = None
+    drawdown: Optional[str] = None
+    amount: Optional[float] = Field(default=None, gt=0)
+    repayment: Optional[str] = None
+    prepayment: Optional[float] = Field(default=None, ge=0)
     prepayment_date: Optional[str] = None
     bank_interest: Optional[float] = None
 
@@ -245,6 +264,20 @@ async def delete_cc_transaction(tid: str):
         raise HTTPException(404, "Transaction not found")
 
 
+@api_router.put("/cc-transactions/{tid}")
+async def update_cc_transaction(tid: str, body: CCTransactionUpdate):
+    existing = await db.cc_transactions.find_one({"id": tid}, NO_ID)
+    if not existing:
+        raise HTTPException(404, "Transaction not found")
+    changes = {k: v for k, v in body.model_dump().items() if v is not None}
+    merged = {**existing, **changes}
+    if merged.get("debit", 0) <= 0 and merged.get("credit", 0) <= 0:
+        raise HTTPException(400, "Enter a debit or credit amount")
+    if changes:
+        await db.cc_transactions.update_one({"id": tid}, {"$set": changes})
+    return await db.cc_transactions.find_one({"id": tid}, NO_ID)
+
+
 @api_router.post("/cc-transactions/import/parse")
 async def import_parse(file: UploadFile = File(...)):
     content = await file.read()
@@ -327,6 +360,20 @@ async def delete_wcdl_loan(lid: str):
     res = await db.wcdl_loans.delete_one({"id": lid})
     if not res.deleted_count:
         raise HTTPException(404, "Loan not found")
+
+
+@api_router.put("/wcdl-loans/{lid}")
+async def update_wcdl_loan(lid: str, body: WCDLLoanUpdate):
+    existing = await db.wcdl_loans.find_one({"id": lid}, NO_ID)
+    if not existing:
+        raise HTTPException(404, "Loan not found")
+    changes = {k: v for k, v in body.model_dump().items() if v is not None}
+    merged = {**existing, **changes}
+    if merged["repayment"] <= merged["drawdown"]:
+        raise HTTPException(400, "Repayment date must be after drawdown")
+    if changes:
+        await db.wcdl_loans.update_one({"id": lid}, {"$set": changes})
+    return await db.wcdl_loans.find_one({"id": lid}, NO_ID)
 
 
 @api_router.get("/bank-certificates")

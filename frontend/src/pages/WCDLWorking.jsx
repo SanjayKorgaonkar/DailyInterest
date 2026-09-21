@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Calculator, CornerDownRight, Trash2 } from "lucide-react";
+import { Calculator, Check, CornerDownRight, Pencil, Trash2, X } from "lucide-react";
 import { Header } from "../components/Header";
 import { Modal, Field } from "../components/Modal";
 import { BankCertificate } from "../components/BankCertificate";
@@ -11,12 +11,27 @@ export default function WCDLWorking({ facilities, month, onAction, refreshAll, f
   const [facilityId, setFacilityId] = useState("");
   const [working, setWorking] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
   const load = () => api.get("/wcdl-working", { params: { month, ...(facilityId ? { facility_id: facilityId } : {}) } }).then((r) => setWorking(r.data)).catch((e) => onAction(errorText(e)));
   useEffect(() => { load(); }, [facilityId, month]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (focusFacilityId && autoOpenForm) setShowForm(true); }, [focusFacilityId, autoOpenForm]);
   useEffect(() => { if (focusFacilityId) setFacilityId(focusFacilityId); }, [focusFacilityId]);
   const remove = async (id) => {
     try { await api.delete(`/wcdl-loans/${id}`); onAction("Loan removed"); load(); refreshAll(); } catch (e) { onAction(errorText(e)); }
+  };
+  const startEdit = (r) => { setEditingId(r.id); setEditForm({ loan: r.loan, drawdown: r.drawdown, amount: r.amount, repayment: r.repayment, bank_interest: r.bank ?? "" }); };
+  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
+  const saveEdit = async (id) => {
+    setSavingEdit(true);
+    try {
+      await api.put(`/wcdl-loans/${id}`, { loan: editForm.loan, drawdown: editForm.drawdown, amount: Number(editForm.amount), repayment: editForm.repayment, bank_interest: editForm.bank_interest === "" ? null : Number(editForm.bank_interest) });
+      onAction("Loan updated · interest recalculated");
+      cancelEdit();
+      load();
+      refreshAll();
+    } catch (e) { onAction(errorText(e)); } finally { setSavingEdit(false); }
   };
   const rows = working?.rows || [];
   const conventions = [...new Set(wcdlFacilities.filter((f) => !facilityId || f.id === facilityId).map((f) => f.day_count))];
@@ -44,23 +59,38 @@ export default function WCDLWorking({ facilities, month, onAction, refreshAll, f
           <thead><tr>{["Loan number", "Drawdown", "Amount", "Repayment", "Period", "Principal", "Days", "Rate", "Basis", "Our interest", "Bank interest", "Variance", ""].map((x) => <th key={x}>{x}</th>)}</tr></thead>
           <tbody>
             {rows.length === 0 && <tr><td colSpan={13} className="empty" data-testid="wcdl-empty-state">No loans outstanding in {monthLong(month)}.</td></tr>}
-            {rows.map((r, i) => (
-              <tr key={`${r.id}-${i}`} className={r.segment ? "segment-row" : ""} data-testid={r.segment ? "wcdl-segment-row" : "wcdl-row"}>
-                <td>{r.segment ? <span className="seg-label"><CornerDownRight size={12} /> {r.principal !== r.amount && r.prepayment ? "Prepayment" : "Rate change"}</span> : <><b>{r.loan}</b><small>{r.bank_name}</small></>}</td>
-                <td>{r.segment ? "" : fmtDate(r.drawdown)}</td>
-                <td className="mono">{r.segment ? "" : money(r.amount)}</td>
-                <td>{r.segment ? "" : fmtDate(r.repayment)}</td>
-                <td className="mono">{fmtDate(r.from)} → {fmtDate(r.to)}</td>
-                <td className="mono">{money(r.principal)}</td>
-                <td className="mono">{r.days}</td>
-                <td className="mono">{r.segment ? <span className="rate-pill">{pct(r.rate)}</span> : pct(r.rate)}</td>
-                <td><span className="conv">A/{r.day_count}</span></td>
-                <td className="mono">{rupee(r.interest)}</td>
-                <td className="mono">{r.bank == null ? "—" : rupee(r.bank)}</td>
-                <td className={`mono ${r.variance ? "danger-text" : "positive"}`}>{r.variance == null ? "—" : r.variance ? `${r.variance > 0 ? "+" : ""}${rupee(r.variance)}` : "Nil"}</td>
-                <td>{!r.segment && <button className="icon-btn" data-testid={`delete-wcdl-${r.id}`} aria-label="Delete" onClick={() => remove(r.id)}><Trash2 size={14} /></button>}</td>
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              const isEditing = !r.segment && editingId === r.id;
+              return (
+                <tr key={`${r.id}-${i}`} className={r.segment ? "segment-row" : isEditing ? "editing-row" : ""} data-testid={r.segment ? "wcdl-segment-row" : "wcdl-row"}>
+                  <td>{isEditing ? <input className="inline-edit-input" data-testid={`wcdl-edit-loan-${r.id}`} value={editForm.loan} onChange={(e) => setEditForm({ ...editForm, loan: e.target.value })} /> : r.segment ? <span className="seg-label"><CornerDownRight size={12} /> {r.principal !== r.amount && r.prepayment ? "Prepayment" : "Rate change"}</span> : <><b>{r.loan}</b><small>{r.bank_name}</small></>}</td>
+                  <td>{isEditing ? <input type="date" className="inline-edit-input" data-testid={`wcdl-edit-drawdown-${r.id}`} value={editForm.drawdown} onChange={(e) => setEditForm({ ...editForm, drawdown: e.target.value })} /> : r.segment ? "" : fmtDate(r.drawdown)}</td>
+                  <td className="mono">{isEditing ? <input type="number" min="1" step="0.01" className="inline-edit-input mono" data-testid={`wcdl-edit-amount-${r.id}`} value={editForm.amount} onChange={(e) => setEditForm({ ...editForm, amount: e.target.value })} /> : r.segment ? "" : money(r.amount)}</td>
+                  <td>{isEditing ? <input type="date" className="inline-edit-input" data-testid={`wcdl-edit-repayment-${r.id}`} value={editForm.repayment} onChange={(e) => setEditForm({ ...editForm, repayment: e.target.value })} /> : r.segment ? "" : fmtDate(r.repayment)}</td>
+                  <td className="mono">{fmtDate(r.from)} → {fmtDate(r.to)}</td>
+                  <td className="mono">{money(r.principal)}</td>
+                  <td className="mono">{r.days}</td>
+                  <td className="mono">{r.segment ? <span className="rate-pill">{pct(r.rate)}</span> : pct(r.rate)}</td>
+                  <td><span className="conv">A/{r.day_count}</span></td>
+                  <td className="mono">{rupee(r.interest)}</td>
+                  <td className="mono">{isEditing ? <input type="number" min="0" step="0.01" className="inline-edit-input mono" data-testid={`wcdl-edit-bank-interest-${r.id}`} value={editForm.bank_interest} onChange={(e) => setEditForm({ ...editForm, bank_interest: e.target.value })} /> : (r.bank == null ? "—" : rupee(r.bank))}</td>
+                  <td className={`mono ${r.variance ? "danger-text" : "positive"}`}>{r.variance == null ? "—" : r.variance ? `${r.variance > 0 ? "+" : ""}${rupee(r.variance)}` : "Nil"}</td>
+                  <td>
+                    {isEditing ? (
+                      <div className="row-edit-actions">
+                        <button className="icon-btn" data-testid={`save-wcdl-edit-${r.id}`} aria-label="Save" disabled={savingEdit} onClick={() => saveEdit(r.id)}><Check size={14} /></button>
+                        <button className="icon-btn" data-testid={`cancel-wcdl-edit-${r.id}`} aria-label="Cancel" onClick={cancelEdit}><X size={14} /></button>
+                      </div>
+                    ) : !r.segment && (
+                      <div className="row-edit-actions">
+                        <button className="icon-btn" data-testid={`edit-wcdl-${r.id}`} aria-label="Edit" onClick={() => startEdit(r)}><Pencil size={13} /></button>
+                        <button className="icon-btn" data-testid={`delete-wcdl-${r.id}`} aria-label="Delete" onClick={() => remove(r.id)}><Trash2 size={14} /></button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

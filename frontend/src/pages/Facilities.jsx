@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, History, Trash2 } from "lucide-react";
+import { Check, CheckCircle2, History, Pencil, Trash2, X } from "lucide-react";
 import { Header } from "../components/Header";
 import { Modal, Field, Segmented } from "../components/Modal";
 import { api, errorText } from "../lib/api";
@@ -11,8 +11,22 @@ export default function Facilities({ data, onAction, reload, onNavigate }) {
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [rateFor, setRateFor] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
   const filtered = data.filter((f) => `${f.bank} ${f.name} ${f.type}`.toLowerCase().includes(query.toLowerCase()));
   const selected = rateFor && data.find((f) => f.id === rateFor);
+  const startEdit = (f) => { setEditingId(f.id); setEditForm({ bank: f.bank, name: f.name, limit: f.limit, start: f.start, maturity: f.maturity, status: f.status, day_count: f.day_count }); };
+  const cancelEdit = () => { setEditingId(null); setEditForm({}); };
+  const saveEdit = async (id) => {
+    setSavingEdit(true);
+    try {
+      await api.put(`/facilities/${id}`, { bank: editForm.bank.trim(), name: editForm.name.trim(), limit: Number(editForm.limit), start: editForm.start, maturity: editForm.maturity, status: editForm.status, day_count: Number(editForm.day_count) });
+      onAction("Facility updated");
+      cancelEdit();
+      reload();
+    } catch (e) { onAction(errorText(e)); } finally { setSavingEdit(false); }
+  };
   return (
     <>
       <Header eyebrow={`MASTER DATA · ${String(data.length).padStart(2, "0")} FACILITIES`} title="Facility master" sub="Keep limits, pricing history and day-count conventions in one controlled register.">
@@ -26,20 +40,49 @@ export default function Facilities({ data, onAction, reload, onNavigate }) {
         <table>
           <thead><tr><th>Bank / facility</th><th>Type</th><th>Sanctioned limit</th><th>Outstanding</th><th>Current rate</th><th>Convention</th><th>Start date</th><th>Maturity</th><th>Status</th><th></th></tr></thead>
           <tbody>
-            {filtered.map((f) => (
-              <tr key={f.id} data-testid={`facility-row-${f.id}`}>
-                <td><b>{f.bank}</b><small>{f.name}</small></td>
-                <td><span className={`tag ${f.type.toLowerCase()}`}>{f.type}</span></td>
-                <td className="mono">{money(f.limit)}</td>
-                <td className="mono">{money(f.outstanding)}</td>
-                <td className="mono" data-testid={`facility-rate-${f.id}`}>{pct(f.rate)}<small>{f.rate_history.length > 1 ? `${f.rate_history.length - 1} change${f.rate_history.length > 2 ? "s" : ""}` : "no changes"}</small></td>
-                <td><span className="conv" data-testid={`facility-convention-${f.id}`}>Actual/{f.day_count}</span></td>
-                <td>{fmtDate(f.start)}</td>
-                <td>{f.maturity}</td>
-                <td><span className="status">● {f.status}</span></td>
-                <td><button className="text-btn row-btn" data-testid={`rate-history-button-${f.id}`} onClick={() => setRateFor(f.id)}><History size={14} /> Rate history</button></td>
-              </tr>
-            ))}
+            {filtered.map((f) => {
+              const isEditing = editingId === f.id;
+              return (
+                <tr key={f.id} className={isEditing ? "editing-row" : ""} data-testid={`facility-row-${f.id}`}>
+                  <td>{isEditing ? (
+                    <div className="inline-edit-stack">
+                      <input className="inline-edit-input" data-testid={`facility-edit-bank-${f.id}`} value={editForm.bank} onChange={(e) => setEditForm({ ...editForm, bank: e.target.value })} placeholder="Bank" />
+                      <input className="inline-edit-input" data-testid={`facility-edit-name-${f.id}`} value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Facility name" />
+                    </div>
+                  ) : <><b>{f.bank}</b><small>{f.name}</small></>}</td>
+                  <td><span className={`tag ${f.type.toLowerCase()}`}>{f.type}</span></td>
+                  <td className="mono">{isEditing ? <input type="number" min="1" step="1" className="inline-edit-input mono" data-testid={`facility-edit-limit-${f.id}`} value={editForm.limit} onChange={(e) => setEditForm({ ...editForm, limit: e.target.value })} /> : money(f.limit)}</td>
+                  <td className="mono">{money(f.outstanding)}</td>
+                  <td className="mono" data-testid={`facility-rate-${f.id}`}>{pct(f.rate)}<small>{f.rate_history.length > 1 ? `${f.rate_history.length - 1} change${f.rate_history.length > 2 ? "s" : ""}` : "no changes"}</small></td>
+                  <td>{isEditing ? (
+                    <select className="inline-edit-input" data-testid={`facility-edit-daycount-${f.id}`} value={editForm.day_count} onChange={(e) => setEditForm({ ...editForm, day_count: e.target.value })}>
+                      {DAY_COUNT.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                    </select>
+                  ) : <span className="conv" data-testid={`facility-convention-${f.id}`}>Actual/{f.day_count}</span>}</td>
+                  <td>{isEditing ? <input type="date" className="inline-edit-input" data-testid={`facility-edit-start-${f.id}`} value={editForm.start} onChange={(e) => setEditForm({ ...editForm, start: e.target.value })} /> : fmtDate(f.start)}</td>
+                  <td>{isEditing ? <input className="inline-edit-input" data-testid={`facility-edit-maturity-${f.id}`} value={editForm.maturity} onChange={(e) => setEditForm({ ...editForm, maturity: e.target.value })} /> : f.maturity}</td>
+                  <td>{isEditing ? (
+                    <select className="inline-edit-input" data-testid={`facility-edit-status-${f.id}`} value={editForm.status} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+                      <option value="Active">Active</option>
+                      <option value="Closed">Closed</option>
+                    </select>
+                  ) : <span className="status">● {f.status}</span>}</td>
+                  <td>
+                    {isEditing ? (
+                      <div className="row-edit-actions">
+                        <button className="icon-btn" data-testid={`save-facility-edit-${f.id}`} aria-label="Save" disabled={savingEdit} onClick={() => saveEdit(f.id)}><Check size={14} /></button>
+                        <button className="icon-btn" data-testid={`cancel-facility-edit-${f.id}`} aria-label="Cancel" onClick={cancelEdit}><X size={14} /></button>
+                      </div>
+                    ) : (
+                      <div className="row-edit-actions">
+                        <button className="icon-btn" data-testid={`edit-facility-${f.id}`} aria-label="Edit" onClick={() => startEdit(f)}><Pencil size={13} /></button>
+                        <button className="text-btn row-btn" data-testid={`rate-history-button-${f.id}`} onClick={() => setRateFor(f.id)}><History size={14} /> Rate history</button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
