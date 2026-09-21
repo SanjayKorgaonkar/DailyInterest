@@ -12,6 +12,10 @@ Create a desktop application for Banking Facility – CC & WCDL Interest Working
 - Period selector = calendar month (YYYY-MM); default current month. Indian FY (Apr–Mar) used for YTD.
 - IDs are UUID strings; `_id` never leaves the API. No login in the MVP.
 
+## Data status
+- 2026-09-21: Removed all 4 demo/seed facilities (ICICI Bank, HDFC Bank, Axis Bank, SBI) and their cc_transactions/wcdl_loans/bank_certificates at the user's request — the app is now a clean slate ready for real facility data. Set a permanent `app_meta.seed_disabled=true` flag so `seed.py`'s `seed_if_empty()` never recreates demo data again, even after a backend restart. Verified: empty dashboard/CC/WCDL/reconciliation all render gracefully with zero state, no errors.
+- NOTE FOR NEXT AGENT: the existing pytest suite (`backend/tests/*.py`) has several tests that hardcode the now-deleted demo facility IDs (`icici-cc`, `hdfc-cc`, `axis-wcdl`, `sbi-wcdl`) and their known seed values — these will now fail since the demo data is gone. This is expected and does not affect the live app; the test suite will need to be rewritten to use disposable facilities exclusively (as `test_statement_import.py` and the rewritten WCDL test already do) before it's trustworthy again.
+
 ## Data model (MongoDB)
 - `facilities`: {id, bank, type(CC|WCDL), name, limit, start, maturity, status, day_count, rate_history:[{id, effective_date, rate, remarks}], created_at}
 - `cc_transactions`: {id, facility_id, date, value_date, debit, credit, bank_interest?, auto_matched?, narration, created_at}

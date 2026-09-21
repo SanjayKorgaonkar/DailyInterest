@@ -38,6 +38,8 @@ WCDL_LOANS = [
 
 
 async def seed_if_empty(db):
+    if await db.app_meta.find_one({"key": "seed_disabled"}):
+        return
     if not await db.facilities.count_documents({}):
         for i, f in enumerate(FACILITIES):
             await db.facilities.insert_one({**f, "created_at": _now(i)})
