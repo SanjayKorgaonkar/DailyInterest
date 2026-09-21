@@ -25,9 +25,9 @@ Create a desktop application for Banking Facility – CC & WCDL Interest Working
 ## API
 - GET /api/facilities?month · POST /api/facilities · PUT /api/facilities/{id} (incl. day_count) · DELETE /api/facilities/{id}
 - POST /api/facilities/{id}/rates · DELETE /api/facilities/{id}/rates/{rid}
-- GET /api/cc-working?facility_id&month · POST /api/cc-transactions · DELETE /api/cc-transactions/{id}
+- GET /api/cc-working?facility_id&month · POST /api/cc-transactions · PUT /api/cc-transactions/{id} · DELETE /api/cc-transactions/{id}
 - POST /api/cc-transactions/import/parse (multipart file) · POST /api/cc-transactions/import/commit (facility_id, mapping, rows, dry_run)
-- GET /api/wcdl-working?facility_id&month · POST /api/wcdl-loans · DELETE /api/wcdl-loans/{id}
+- GET /api/wcdl-working?facility_id&month · POST /api/wcdl-loans · PUT /api/wcdl-loans/{id} · DELETE /api/wcdl-loans/{id}
 - GET /api/bank-certificates?facility_id&month · PUT /api/bank-certificates · DELETE /api/bank-certificates/{facility_id}/{month}
 - GET /api/reports/monthly-checklist?month=YYYY-MM (PDF download, defaults to last closed month)
 - GET /api/dashboard?month (includes pending_certificates, pending_month) · GET /api/reconciliation?month
@@ -57,11 +57,12 @@ Create a desktop application for Banking Facility – CC & WCDL Interest Working
 
 - 2026-09-21: **Security audit** (via `security_audit_agent`) — result: FAIL, action required. SEC-001 [HIGH, CONFIRMED]: no authentication on any `/api` route; since the app is internet-reachable via the preview URL, anyone with the link can read, edit, and irreversibly delete all facilities/transactions/loans (`DELETE /api/facilities/{id}` cascades). SEC-002 [MEDIUM, LIKELY]: unbounded file uploads on `/api/cc-transactions/import/parse` (no size/type/row caps) — a large or crafted CSV/XLSX can exhaust server memory (DoS). Hardening-level (low risk): CORS wildcard+credentials (currently non-exploitable, no cookies/tokens used), no rate limiting, unbounded string/number field lengths on Pydantic models. Clean on: NoSQL injection, XSS, PDF injection, hardcoded secrets. **USER DECISION: skip both fixes for now** — explicitly asked user to choose auth approach (JWT/Google/skip) and whether to apply the upload-limit fix; user replied "skip" — no code changes made for either SEC-001 or SEC-002, by deliberate user choice, not oversight. Revisit only if user brings it up again or before any public/production launch.
 
+- 2026-09-21: **Inline editing for facilities/transactions/loans** — user-requested feature. Backend: new `PUT /api/cc-transactions/{id}` (validates debit>0 or credit>0 after merge) and `PUT /api/wcdl-loans/{id}` (validates repayment>drawdown after merge) endpoints added (facility PUT already existed, reused as-is). Frontend: each table (`Facilities.jsx`, `CCWorking.jsx`, `WCDLWorking.jsx`) now has a pencil Edit icon per real/editable row (segment rows from rate-changes and the synthetic CC opening-balance row are correctly excluded — only actual stored records are editable) that turns the visible columns into inline inputs with Save (check icon)/Cancel (X icon) actions, no modal. Facility: bank, name, limit, start, maturity, status, day-count editable (type is locked, cannot change). CC transaction: date, value date, debit, credit, bank charged interest editable (narration excluded — not a visible column). WCDL/GML loan: loan number, drawdown, amount, repayment, bank interest editable (prepayment/prepayment_date excluded — not visible columns); works identically for GML since it shares this page. Tested: iteration_10 (100% backend — new pytest suite `test_inline_edit.py` incl. WCDL+GML parametrization and both validation branches; 100% frontend — edit/save/cancel/recalculation/validation-rejection all verified via Playwright + API; DB restored to 0 facilities). Fixed a minor dev-only React hydration warning (adjacent JSX expressions in CC facility `<option>` → template literal, same pattern as the earlier WCDL fix).
+
 ## Prioritized backlog
 - P0 (deferred by user choice): **Security — add authentication** (SEC-001, HIGH). App is fully open on an internet-reachable preview URL with no login; any visitor can read/edit/delete all financial data. User explicitly chose to skip this for now (2026-09-21) — do not re-implement without asking again, but do flag before any public/production launch.
 - P0 (deferred by user choice): **Security — file upload limits** (SEC-002, MEDIUM). `/api/cc-transactions/import/parse` has no size/type/row caps. User explicitly chose to skip this for now (2026-09-21).
 - P1: Real Excel/PDF export for Reports and Reconciliation (buttons show toast only — MOCKED).
-- P1: Edit existing facility / transaction / loan inline.
 - P1: Rate change report (from rate_history) and monthly MIS.
 - P2: Other bank charges line in reconciliation.
 - P2: Package as Windows desktop executable; optional login.

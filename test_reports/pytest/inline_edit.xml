@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="5" time="1.935" timestamp="2026-09-21T10:59:59.976191+00:00" hostname="agent-env-a359d1f9-ff19-4f0c-ada9-5fe50f45abdd"><testcase classname="tests.test_inline_edit.TestFacilityUpdate" name="test_update_facility_persists" time="0.347" /><testcase classname="tests.test_inline_edit.TestWCDLLoanUpdate" name="test_update_loan_and_validation[WCDL]" time="0.536" /><testcase classname="tests.test_inline_edit" name="test_db_empty_before_and_after" time="0.159"><failure message="AssertionError: Residual test facilities: [{'bank': 'TEST_Bank', 'type': 'WCDL', 'name': 'TEST_WCDL1', 'limit': 2000000.0, 'start': '2025-01-01', 'maturity': '2026-12-31', 'status': 'Active', 'day_count': 365, 'id': 'f689736d-3220-4d49-bfe8-c386643d1481', 'created_at': '2026-09-21T11:00:00.706817+00:00', 'rate_history': [{'id': '0be25748-1183-4f31-9935-f55b5a1a8bf8', 'effective_date': '2025-01-01', 'rate': 8.5, 'remarks': 'Initial pricing'}], 'rate': 8.5, 'outstanding': 0, 'available': 2000000.0}]&#10;assert [{'bank': 'TE...00000.0, ...}] == []&#10;  &#10;  Left contains one more item: {'bank': 'TEST_Bank', 'type': 'WCDL', 'name': 'TEST_WCDL1', 'limit': 2000000.0, ...}&#10;  &#10;  Full diff:&#10;  - []&#10;  + [&#10;  +     {...&#10;  &#10;  ...Full output truncated (23 lines hidden), use '-vv' to show">backend/tests/test_inline_edit.py:130: in test_db_empty_before_and_after
+    assert residual == [], f"Residual test facilities: {residual}"
+E   AssertionError: Residual test facilities: [{'bank': 'TEST_Bank', 'type': 'WCDL', 'name': 'TEST_WCDL1', 'limit': 2000000.0, 'start': '2025-01-01', 'maturity': '2026-12-31', 'status': 'Active', 'day_count': 365, 'id': 'f689736d-3220-4d49-bfe8-c386643d1481', 'created_at': '2026-09-21T11:00:00.706817+00:00', 'rate_history': [{'id': '0be25748-1183-4f31-9935-f55b5a1a8bf8', 'effective_date': '2025-01-01', 'rate': 8.5, 'remarks': 'Initial pricing'}], 'rate': 8.5, 'outstanding': 0, 'available': 2000000.0}]
+E   assert [{'bank': 'TE...00000.0, ...}] == []
+E     
+E     Left contains one more item: {'bank': 'TEST_Bank', 'type': 'WCDL', 'name': 'TEST_WCDL1', 'limit': 2000000.0, ...}
+E     
+E     Full diff:
+E     - []
+E     + [
+E     +     {...
+E     
+E     ...Full output truncated (23 lines hidden), use '-vv' to show</failure></testcase><testcase classname="tests.test_inline_edit.TestWCDLLoanUpdate" name="test_update_loan_and_validation[GML]" time="0.456" /><testcase classname="tests.test_inline_edit.TestCCTransactionUpdate" name="test_update_cc_tx_and_validation" time="0.389" /></testsuite></testsuites>

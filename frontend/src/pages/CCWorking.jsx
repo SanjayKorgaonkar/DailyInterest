@@ -41,7 +41,7 @@ export default function CCWorking({ facilities, month, onAction, refreshAll, foc
     <>
       <Header eyebrow="INTEREST ENGINE · CASH CREDIT" title="CC interest working" sub="Daily debit balance calculation with value-date control and effective-date rate changes.">
         <select className="fac-select" data-testid="cc-facility-select" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
-          {ccFacilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}</option>)}
+          {ccFacilities.map((f) => <option key={f.id} value={f.id}>{`${f.bank} · ${f.name}`}</option>)}
         </select>
         <button className="outline" data-testid="import-working-button" onClick={() => setShowImport(true)} disabled={!facilityId}><Upload size={15} /> Import statement</button>
         <button className="primary" data-testid="add-working-row-button" onClick={() => setShowForm(true)} disabled={!facilityId}>+ Add row</button>
