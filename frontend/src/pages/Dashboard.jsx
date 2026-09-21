@@ -43,7 +43,7 @@ export default function Dashboard({ data, onNavigate, month, onAction }) {
             <span>Enter last month's bank-charged interest so reconciliation is complete before you close the books.</span>
           </div>
           <div className="cert-reminder-pills">
-            <span className="cert-countdown" data-testid="days-remaining-badge">
+            <span className={`cert-countdown${daysLeft < 3 ? " urgent" : ""}`} data-testid="days-remaining-badge">
               <Clock size={12} /> {daysLeft} day{daysLeft === 1 ? "" : "s"} to month-end close
             </span>
             {pending.map((p) => (
