@@ -1,0 +1,25 @@
+{
+  "summary": "Tested new GML (Gold Metal Loan) facility type end-to-end: backend API + full UI wizard flow, WCDL working page integration, CC opening-balance guidance note regression, Dashboard 'AK' greeting, and navigation sanity of Dashboard/Reconciliation/Reports. All 6 backend pytest cases passed and all UI assertions passed. DB restored to 0 facilities after cleanup.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "WCDL Working / facility <select>", "issues": ["Dev-mode React hydration warning: <span> cannot be a child of <option>. Caused by Emergent's live-instrumentation wrapper around the inline JSX expression `{f.type === 'GML' ? ' (GML)' : ''}` inside <option>. Runtime UI still renders correctly (dropdown shows 'TEST_UI_GML · TEST UI Gold Loan (GML)'). This is a dev-only warning and not a production bug, but concatenating the string outside JSX (e.g. `{`${f.bank} · ${f.name}${f.type==='GML'?' (GML)':''}`}`) would silence it."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_gml_facility.py", "/app/test_reports/pytest/gml_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Consider concatenating the GML suffix as a single JS string expression inside <option> children instead of two adjacent JSX expressions to avoid the dev-tool <span>-in-<option> hydration warning (WCDLWorking.jsx lines 28 and 89).",
+    "server.py mixes CORS wildcard with allow_credentials=True, which browsers reject. Preview URL works because credentials aren't sent here, but this is an existing issue, not GML-related."
+  ],
+  "updated_files": ["/app/backend/tests/test_gml_facility.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "N/A - app has no authentication",
+  "seed_data_creation": "Created 1 GML + 1 CC facility for UI testing; both deleted via API at the end. GET /api/facilities returns [] confirmed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "GML feature works end-to-end. Backend: /api/facilities accepts type=GML, /api/wcdl-working returns GML rows, /api/wcdl-loans accepts GML facility and rejects CC. Frontend: 3-option Type segmented control (CC/WCDL/GML) in wizard step 1, GML default maturity=90 days, .tag.gml badge in Facility Master, WCDL Working page shows GML in dropdown with '(GML)' suffix, loan input placeholder switches to GML-*, header title says 'WCDL & gold loan working'. CC first-transaction opening-balance note ([data-testid=opening-balance-note]) renders correctly on brand-new CC facility. Dashboard greeting shows 'AK'. DB confirmed empty post-test.",
+  "rca of the issue": "No blocking issues found."
+}

@@ -25,7 +25,7 @@ export default function WCDLWorking({ facilities, month, onAction, refreshAll, f
       <Header eyebrow="INTEREST ENGINE · WCDL / GML" title="WCDL & gold loan working" sub="Term-loan principal, tenor and prepayment tracking with per-bank day-count conventions.">
         <select className="fac-select" data-testid="wcdl-facility-select" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
           <option value="">All WCDL / GML facilities</option>
-          {wcdlFacilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}{f.type === "GML" ? " (GML)" : ""}</option>)}
+          {wcdlFacilities.map((f) => <option key={f.id} value={f.id}>{`${f.bank} · ${f.name}${f.type === "GML" ? " (GML)" : ""}`}</option>)}
         </select>
         <button className="primary" data-testid="add-working-row-button" onClick={() => setShowForm(true)} disabled={!wcdlFacilities.length}>+ Add loan</button>
       </Header>
@@ -86,7 +86,7 @@ function LoanForm({ facilities, defaultFacility, onClose, onSaved, onError }) {
     <Modal title="Add loan" eyebrow="LOAN LEDGER" onClose={onClose} testId="wcdl-loan-form">
       <form onSubmit={submit} className="form-grid">
         <Field label="Facility">
-          <select required data-testid="wcdl-form-facility-select" value={form.facility_id} onChange={set("facility_id")}>{facilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}{f.type === "GML" ? " (GML)" : ""}</option>)}</select>
+          <select required data-testid="wcdl-form-facility-select" value={form.facility_id} onChange={set("facility_id")}>{facilities.map((f) => <option key={f.id} value={f.id}>{`${f.bank} · ${f.name}${f.type === "GML" ? " (GML)" : ""}`}</option>)}</select>
         </Field>
         <Field label="Loan number"><input required data-testid="wcdl-loan-input" value={form.loan} onChange={set("loan")} placeholder={selectedType === "GML" ? "e.g. GML-AX-2501" : "e.g. WCDL-AX-2501"} /></Field>
         <Field label="Drawdown date"><input required type="date" data-testid="wcdl-drawdown-input" value={form.drawdown} onChange={set("drawdown")} /></Field>
