@@ -1,0 +1,36 @@
+{
+  "name": "ledgerline-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ledgerline - Banking Facility Interest Working (Desktop)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.ledgerline.desktop",
+    "productName": "Ledgerline",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "package.json"],
+    "extraResources": [
+      { "from": "resources/mongodb", "to": "mongodb" },
+      { "from": "resources/backend", "to": "backend" },
+      { "from": "resources/frontend-build", "to": "frontend-build" },
+      { "from": "resources/icon.png", "to": "icon.png" }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}

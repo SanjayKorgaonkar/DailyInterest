@@ -1,14 +1,18 @@
 # Ledgerline — Run on Your Own Windows PC
 
 This app is a normal web app (React frontend + FastAPI backend + MongoDB database).
-Running it "locally" means all three pieces run on your own PC and you open it in
-your browser at `http://localhost:3000` — no internet connection required once set up.
+There are two ways to run it fully offline on your own PC:
 
-> Note: this is **not** a single double-click `.exe` installer (that would need a
-> separate packaging project — Electron + bundling Python + bundling MongoDB — which
-> is a bigger, dedicated build). What's below is the fastest, most reliable way to
-> get the exact same app running fully offline on your PC today. Ask me if you'd
-> like me to scope the full `.exe` packaging as a follow-up task.
+1. **True Windows installer (`.exe`)** — a real double-click app with the backend
+   and MongoDB bundled inside, no separate installs needed by you. See
+   `desktop/BUILD_WINDOWS.md` — it's a one-time build step run on a Windows PC
+   (packaging tools can't cross-compile, so this can't be produced from here
+   directly, but everything needed has been prepared and pre-validated).
+2. **Manual local run** (this document) — install Python/Node/MongoDB yourself
+   and start the three pieces with simple scripts. Faster to try right now.
+
+## Manual local run
+
 
 ## 1. Get the code
 Use the **"Save to GitHub"** button in the Emergent chat to push this project to a

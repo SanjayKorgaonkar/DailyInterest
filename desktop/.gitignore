@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+resources/backend/*.exe
+resources/backend/*.pkg
+resources/mongodb/*.exe
+resources/frontend-build/*
+!resources/frontend-build/README.txt
