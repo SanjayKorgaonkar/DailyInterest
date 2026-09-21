@@ -1,0 +1,50 @@
+{
+  "summary": "Validated the new 3-step Facility wizard end-to-end on the live preview URL against an empty DB (0 facilities). All step gating, progress indicator states (active/done), pre-fills, Back-preserves-values, formula-preview live update, POST /api/facilities persistence, and downstream reflection on Dashboard + CC Interest Working all work correctly. Fresh-state reopen after abandoning mid-flow also verified. DB left empty (test facility deleted). Empty states on Dashboard and Facility Master render cleanly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "CC Interest Working <select> option", "issues": ["React hydration console warning: '<span> cannot be a child of <option>'. Caused by dev-time instrumentation wrapping text nodes with <span style=display:contents> inside <option>. Not user-visible but pollutes the console."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "(Optional/minor) Investigate the hydration warning on CC Interest Working page — likely tied to the dev-instrumentation (x-ve-dynamic spans) inside <option> children; only visible in console, doesn't affect functionality."
+  ],
+  "critical_code_review_comments": [
+    "FacilityForm wizard (Facilities.jsx) is clean, single component ~130 lines — OK size. Step state resets naturally because <FacilityForm> is unmounted on close (showForm=false), which is why the fresh-reopen test passes; good pattern.",
+    "Step-2 Maturity pre-fill is set only when Type is changed on step 1; if a user changes Type after going forward and coming back, maturity is overwritten (acceptable UX, but worth noting).",
+    "Rate min='0.01' on step 3 enforces > 0; consistent with valid[3] check. Good.",
+    "No trim on facility name/bank before POST — leading/trailing whitespace would persist. Minor."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "N/A (no auth)",
+  "seed_data_creation": "Temporarily created one facility (Kotak Mahindra Bank / Cash Credit / CC / limit 2Cr / rate 9.25% / Actual-365) to test the wizard end-to-end; deleted via DELETE /api/facilities/{id} after testing. DB is back to 0 facilities as required.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The 3-step facility wizard is fully functional. DB is intentionally empty (app_meta.seed_disabled flag is set). Old pytest test files that hardcode icici-cc/hdfc-cc/axis-wcdl/sbi-wcdl IDs will still fail — separate backlog item, don't touch. When testing anything that requires facilities, CREATE them via the wizard/POST and DELETE when done.",
+  "verified_flows": [
+    "Empty-state Dashboard: 0 total facilities, ₹0 metrics, no cert banner, no crash",
+    "Empty Facility Master table renders",
+    "Wizard opens on new-facility-button",
+    "wizard-progress with 3 steps rendered; step 1 active by default",
+    "Step 1 Next disabled until bank+name filled; Cancel shown (not Back)",
+    "Step 1 -> 2: step-1 class becomes 'wizard-step done', step-2 becomes 'wizard-step active'",
+    "Step 2 start pre-fills today (2026-09-21), maturity pre-fills 'On demand' for CC",
+    "Step 2 Back button shown; clicking Back preserves bank='Kotak Mahindra Bank'",
+    "Step 2 Next disabled until limit > 0",
+    "Step 3 shows rate input, day-count segmented, and wizard-formula-preview",
+    "Formula preview updates live: 'Outstanding × 9.25% × Days ÷ 365'",
+    "Submit disabled until rate > 0; label reads 'Create facility'",
+    "POST /api/facilities succeeds, modal closes, row appears with correct data (2.00 Cr limit, 9.25%, Actual/365)",
+    "Dashboard reflects 'Across 1 banks' and shows Kotak",
+    "CC Interest Working page dropdown shows the new Kotak CC facility",
+    "Reopen wizard after successful create: fresh state (bank empty, step 1 active)",
+    "Abandon on step 2 via X-close, reopen: fresh state (bank empty, step 1 active)"
+  ]
+}

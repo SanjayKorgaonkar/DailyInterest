@@ -68,7 +68,7 @@ function FacilityForm({ onClose, onSaved, onError }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const r = await api.post("/facilities", { ...form, limit: Number(form.limit), rate: Number(form.rate) });
+      const r = await api.post("/facilities", { ...form, bank: form.bank.trim(), name: form.name.trim(), limit: Number(form.limit), rate: Number(form.rate) });
       onSaved(r.data);
     } catch (err) { onError(errorText(err)); } finally { setSaving(false); }
   };
