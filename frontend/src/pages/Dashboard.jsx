@@ -29,7 +29,7 @@ export default function Dashboard({ data, onNavigate, month, onAction }) {
   };
   return (
     <>
-      <Header eyebrow={`CONTROL CENTRE · ${monthLong(month).toUpperCase()}`} title="Good morning, Ankit" sub="Here’s the position across your working capital facilities.">
+      <Header eyebrow={`CONTROL CENTRE · ${monthLong(month).toUpperCase()}`} title="Good morning, AK" sub="Here’s the position across your working capital facilities.">
         <button className="outline" data-testid="download-checklist-button" disabled={downloading} onClick={downloadChecklist}>
           <FileDown size={15} /> {downloading ? "Preparing…" : `${monthLong(d.pending_month)} checklist`}
         </button>

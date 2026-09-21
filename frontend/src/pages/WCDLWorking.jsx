@@ -7,7 +7,7 @@ import { api, errorText } from "../lib/api";
 import { rupee, money, pct, fmtDate, monthLong, today } from "../lib/format";
 
 export default function WCDLWorking({ facilities, month, onAction, refreshAll, focusFacilityId, autoOpenForm }) {
-  const wcdlFacilities = facilities.filter((f) => f.type === "WCDL");
+  const wcdlFacilities = facilities.filter((f) => f.type === "WCDL" || f.type === "GML");
   const [facilityId, setFacilityId] = useState("");
   const [working, setWorking] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -22,10 +22,10 @@ export default function WCDLWorking({ facilities, month, onAction, refreshAll, f
   const conventions = [...new Set(wcdlFacilities.filter((f) => !facilityId || f.id === facilityId).map((f) => f.day_count))];
   return (
     <>
-      <Header eyebrow="INTEREST ENGINE · WCDL" title="WCDL interest working" sub="Term-loan principal, tenor and prepayment tracking with per-bank day-count conventions.">
+      <Header eyebrow="INTEREST ENGINE · WCDL / GML" title="WCDL & gold loan working" sub="Term-loan principal, tenor and prepayment tracking with per-bank day-count conventions.">
         <select className="fac-select" data-testid="wcdl-facility-select" value={facilityId} onChange={(e) => setFacilityId(e.target.value)}>
-          <option value="">All WCDL facilities</option>
-          {wcdlFacilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}</option>)}
+          <option value="">All WCDL / GML facilities</option>
+          {wcdlFacilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}{f.type === "GML" ? " (GML)" : ""}</option>)}
         </select>
         <button className="primary" data-testid="add-working-row-button" onClick={() => setShowForm(true)} disabled={!wcdlFacilities.length}>+ Add loan</button>
       </Header>
@@ -37,7 +37,7 @@ export default function WCDLWorking({ facilities, month, onAction, refreshAll, f
       {facilityId && <BankCertificate facilityId={facilityId} month={month} calculated={working?.calculated_bank || 0} onChanged={() => { load(); refreshAll(); }} onError={onAction} />}
       <div className="table-wrap">
         <div className="table-toolbar">
-          <b>WCDL loan ledger · {monthLong(month)}</b>
+          <b>Loan ledger · {monthLong(month)}</b>
           <span className="toolbar-total">Our interest <strong data-testid="wcdl-total-interest">{rupee(working?.ours)}</strong> · Bank <strong data-testid="wcdl-total-bank">{rupee(working?.bank)}</strong> · Variance <strong className={working?.variance ? "danger-text" : "positive"} data-testid="wcdl-total-variance">{working?.variance > 0 ? "+" : ""}{rupee(working?.variance)}</strong></span>
         </div>
         <table>
@@ -73,6 +73,7 @@ function LoanForm({ facilities, defaultFacility, onClose, onSaved, onError }) {
   const [form, setForm] = useState({ facility_id: defaultFacility, loan: "", drawdown: today(), amount: "", repayment: "", prepayment: "", prepayment_date: "", bank_interest: "" });
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const selectedType = facilities.find((f) => f.id === form.facility_id)?.type;
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -82,12 +83,12 @@ function LoanForm({ facilities, defaultFacility, onClose, onSaved, onError }) {
     } catch (err) { onError(errorText(err)); } finally { setSaving(false); }
   };
   return (
-    <Modal title="Add WCDL loan" eyebrow="WCDL LEDGER" onClose={onClose} testId="wcdl-loan-form">
+    <Modal title="Add loan" eyebrow="LOAN LEDGER" onClose={onClose} testId="wcdl-loan-form">
       <form onSubmit={submit} className="form-grid">
         <Field label="Facility">
-          <select required data-testid="wcdl-form-facility-select" value={form.facility_id} onChange={set("facility_id")}>{facilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}</option>)}</select>
+          <select required data-testid="wcdl-form-facility-select" value={form.facility_id} onChange={set("facility_id")}>{facilities.map((f) => <option key={f.id} value={f.id}>{f.bank} · {f.name}{f.type === "GML" ? " (GML)" : ""}</option>)}</select>
         </Field>
-        <Field label="Loan number"><input required data-testid="wcdl-loan-input" value={form.loan} onChange={set("loan")} placeholder="e.g. WCDL-AX-2501" /></Field>
+        <Field label="Loan number"><input required data-testid="wcdl-loan-input" value={form.loan} onChange={set("loan")} placeholder={selectedType === "GML" ? "e.g. GML-AX-2501" : "e.g. WCDL-AX-2501"} /></Field>
         <Field label="Drawdown date"><input required type="date" data-testid="wcdl-drawdown-input" value={form.drawdown} onChange={set("drawdown")} /></Field>
         <Field label="Repayment date"><input required type="date" data-testid="wcdl-repayment-input" value={form.repayment} onChange={set("repayment")} /></Field>
         <Field label="Amount (₹)"><input required type="number" min="1" step="0.01" data-testid="wcdl-amount-input" value={form.amount} onChange={set("amount")} /></Field>

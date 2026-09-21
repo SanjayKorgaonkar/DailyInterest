@@ -39,7 +39,7 @@ def current_month():
 
 class FacilityIn(BaseModel):
     bank: str
-    type: Literal["CC", "WCDL"]
+    type: Literal["CC", "WCDL", "GML"]
     name: str
     limit: float
     start: str
@@ -284,7 +284,7 @@ async def import_commit(body: ImportCommitIn):
 @api_router.get("/wcdl-working")
 async def wcdl_working(facility_id: Optional[str] = None, month: Optional[str] = None):
     month = month or current_month()
-    query = {"type": "WCDL"}
+    query = {"type": {"$in": ["WCDL", "GML"]}}
     if facility_id:
         query["id"] = facility_id
     facs = await db.facilities.find(query, NO_ID).sort("created_at", 1).to_list(1000)
@@ -311,8 +311,8 @@ async def wcdl_working(facility_id: Optional[str] = None, month: Optional[str] =
 @api_router.post("/wcdl-loans", status_code=201)
 async def add_wcdl_loan(body: WCDLLoanIn):
     fac = await get_facility(body.facility_id)
-    if fac["type"] != "WCDL":
-        raise HTTPException(400, "Loans can only be added to WCDL facilities")
+    if fac["type"] not in ("WCDL", "GML"):
+        raise HTTPException(400, "Loans can only be added to WCDL or Gold Metal Loan facilities")
     if body.repayment <= body.drawdown:
         raise HTTPException(400, "Repayment date must be after drawdown")
     doc = body.model_dump()

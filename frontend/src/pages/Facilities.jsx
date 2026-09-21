@@ -109,7 +109,7 @@ function FacilityForm({ onClose, onSaved, onError }) {
             <Field label="Bank"><input required autoFocus data-testid="facility-bank-input" value={form.bank} onChange={set("bank")} placeholder="e.g. Kotak Mahindra Bank" /></Field>
             <Field label="Facility name"><input required data-testid="facility-name-input" value={form.name} onChange={set("name")} placeholder="e.g. Cash Credit" /></Field>
             <Field label="Type">
-              <Segmented testId="facility-type" value={form.type} options={[{ value: "CC", label: "Cash Credit" }, { value: "WCDL", label: "WCDL" }]} onChange={(v) => setForm({ ...form, type: v, maturity: v === "CC" ? "On demand" : "90 days" })} />
+              <Segmented testId="facility-type" value={form.type} options={[{ value: "CC", label: "Cash Credit" }, { value: "WCDL", label: "WCDL" }, { value: "GML", label: "Gold Metal Loan" }]} onChange={(v) => setForm({ ...form, type: v, maturity: v === "CC" ? "On demand" : "90 days" })} />
             </Field>
           </>
         )}

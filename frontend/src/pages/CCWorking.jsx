@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BadgeCheck, Calculator, CheckCircle2, CornerDownRight, FileWarning, Trash2, Upload, UploadCloud } from "lucide-react";
+import { BadgeCheck, Calculator, CheckCircle2, CornerDownRight, FileWarning, Landmark, Trash2, Upload, UploadCloud } from "lucide-react";
 import { Header } from "../components/Header";
 import { Modal, Field } from "../components/Modal";
 import { BankCertificate } from "../components/BankCertificate";
@@ -65,14 +65,14 @@ export default function CCWorking({ facilities, month, onAction, refreshAll, foc
           </tbody>
         </table>
       </div>
-      {showForm && <TransactionForm facilityId={facilityId} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); onAction("Transaction added · interest recalculated"); load(); refreshAll(); }} onError={onAction} />}
+      {showForm && <TransactionForm facilityId={facilityId} isFirst={rows.filter((r) => !r.opening).length === 0} facilityStart={fac?.start} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); onAction("Transaction added · interest recalculated"); load(); refreshAll(); }} onError={onAction} />}
       {showImport && <StatementImportModal facilityId={facilityId} onClose={() => setShowImport(false)} onImported={(n) => { setShowImport(false); onAction(`${n} transaction${n === 1 ? "" : "s"} imported · interest recalculated`); load(); refreshAll(); }} onError={onAction} />}
     </>
   );
 }
 
-function TransactionForm({ facilityId, onClose, onSaved, onError }) {
-  const [form, setForm] = useState({ date: today(), value_date: "", debit: "", credit: "", bank_interest: "", narration: "" });
+function TransactionForm({ facilityId, isFirst, facilityStart, onClose, onSaved, onError }) {
+  const [form, setForm] = useState({ date: (isFirst && facilityStart) || today(), value_date: "", debit: "", credit: "", bank_interest: "", narration: isFirst ? "Opening balance carried forward" : "" });
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const submit = async (e) => {
@@ -85,10 +85,16 @@ function TransactionForm({ facilityId, onClose, onSaved, onError }) {
   };
   return (
     <Modal title="Add CC transaction" eyebrow="CC LEDGER" onClose={onClose} testId="cc-transaction-form">
+      {isFirst && (
+        <div className="opening-balance-note" data-testid="opening-balance-note">
+          <Landmark size={15} />
+          <span>This is this facility's first entry. If it already carries an existing outstanding balance, enter it as a <b>Debit</b> dated on the facility's start date so day-one interest is calculated correctly.</span>
+        </div>
+      )}
       <form onSubmit={submit} className="form-grid">
         <Field label="Transaction date"><input required type="date" data-testid="cc-date-input" value={form.date} onChange={set("date")} /></Field>
         <Field label="Value date" hint="Defaults to transaction date"><input type="date" data-testid="cc-value-date-input" value={form.value_date} onChange={set("value_date")} /></Field>
-        <Field label="Debit (₹)"><input type="number" min="0" step="0.01" data-testid="cc-debit-input" value={form.debit} onChange={set("debit")} /></Field>
+        <Field label="Debit (₹)" hint={isFirst ? "Existing outstanding balance, if any" : undefined}><input type="number" min="0" step="0.01" data-testid="cc-debit-input" value={form.debit} onChange={set("debit")} /></Field>
         <Field label="Credit (₹)"><input type="number" min="0" step="0.01" data-testid="cc-credit-input" value={form.credit} onChange={set("credit")} /></Field>
         <Field label="Bank charged interest (₹)" hint="Optional · for reconciliation"><input type="number" min="0" step="0.01" data-testid="cc-bank-interest-input" value={form.bank_interest} onChange={set("bank_interest")} /></Field>
         <Field label="Narration"><input data-testid="cc-narration-input" value={form.narration} onChange={set("narration")} /></Field>
