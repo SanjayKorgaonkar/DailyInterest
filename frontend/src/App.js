@@ -35,6 +35,7 @@ function App() {
       .catch(() => action("Could not reach the interest engine"));
   }, [month]);
   useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { document.title = pendingCount > 0 ? `(${pendingCount}) Ledgerline` : "Ledgerline"; }, [pendingCount]);
   const go = (id, opts) => {
     setPage(id);
     setMobile(false);
