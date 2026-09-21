@@ -50,9 +50,20 @@ export default function Facilities({ data, onAction, reload }) {
 }
 
 function FacilityForm({ onClose, onSaved, onError }) {
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({ bank: "", type: "CC", name: "", limit: "", start: today(), maturity: "On demand", status: "Active", day_count: 365, rate: "" });
   const [saving, setSaving] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const STEPS = [
+    { n: 1, label: "Basics" },
+    { n: 2, label: "Limit & tenure" },
+    { n: 3, label: "Pricing" },
+  ];
+  const valid = {
+    1: form.bank.trim() && form.name.trim(),
+    2: Number(form.limit) > 0 && form.start && form.maturity.trim(),
+    3: Number(form.rate) > 0,
+  };
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -62,23 +73,55 @@ function FacilityForm({ onClose, onSaved, onError }) {
     } catch (err) { onError(errorText(err)); } finally { setSaving(false); }
   };
   return (
-    <Modal title="New facility" eyebrow="FACILITY MASTER" onClose={onClose} testId="facility-form">
-      <form onSubmit={submit} className="form-grid">
-        <Field label="Bank"><input required data-testid="facility-bank-input" value={form.bank} onChange={set("bank")} placeholder="e.g. Kotak Mahindra Bank" /></Field>
-        <Field label="Facility name"><input required data-testid="facility-name-input" value={form.name} onChange={set("name")} placeholder="e.g. Cash Credit" /></Field>
-        <Field label="Type">
-          <Segmented testId="facility-type" value={form.type} options={[{ value: "CC", label: "Cash Credit" }, { value: "WCDL", label: "WCDL" }]} onChange={(v) => setForm({ ...form, type: v, maturity: v === "CC" ? "On demand" : "90 days" })} />
-        </Field>
-        <Field label="Day-count convention">
-          <Segmented testId="facility-day-count" value={form.day_count} options={DAY_COUNT} onChange={(v) => setForm({ ...form, day_count: v })} />
-        </Field>
-        <Field label="Sanctioned limit (₹)"><input required type="number" min="1" step="1" data-testid="facility-limit-input" value={form.limit} onChange={set("limit")} /></Field>
-        <Field label="Initial rate (% p.a.)" hint="Effective from the start date"><input required type="number" min="0.01" step="0.01" data-testid="facility-rate-input" value={form.rate} onChange={set("rate")} /></Field>
-        <Field label="Start date"><input required type="date" data-testid="facility-start-input" value={form.start} onChange={set("start")} /></Field>
-        <Field label="Maturity"><input required data-testid="facility-maturity-input" value={form.maturity} onChange={set("maturity")} /></Field>
+    <Modal title="New facility" eyebrow="FACILITY MASTER · QUICK-START" onClose={onClose} testId="facility-form">
+      <div className="wizard-progress" data-testid="wizard-progress">
+        {STEPS.map((s) => (
+          <div key={s.n} className={`wizard-step${step === s.n ? " active" : step > s.n ? " done" : ""}`} data-testid={`wizard-step-${s.n}`}>
+            <span className="wizard-dot">{step > s.n ? "✓" : s.n}</span>
+            <small>{s.label}</small>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={submit} className="form-grid wizard-body">
+        {step === 1 && (
+          <>
+            <Field label="Bank"><input required autoFocus data-testid="facility-bank-input" value={form.bank} onChange={set("bank")} placeholder="e.g. Kotak Mahindra Bank" /></Field>
+            <Field label="Facility name"><input required data-testid="facility-name-input" value={form.name} onChange={set("name")} placeholder="e.g. Cash Credit" /></Field>
+            <Field label="Type">
+              <Segmented testId="facility-type" value={form.type} options={[{ value: "CC", label: "Cash Credit" }, { value: "WCDL", label: "WCDL" }]} onChange={(v) => setForm({ ...form, type: v, maturity: v === "CC" ? "On demand" : "90 days" })} />
+            </Field>
+          </>
+        )}
+        {step === 2 && (
+          <>
+            <Field label="Sanctioned limit (₹)"><input required autoFocus type="number" min="1" step="1" data-testid="facility-limit-input" value={form.limit} onChange={set("limit")} /></Field>
+            <Field label="Start date"><input required type="date" data-testid="facility-start-input" value={form.start} onChange={set("start")} /></Field>
+            <Field label="Maturity"><input required data-testid="facility-maturity-input" value={form.maturity} onChange={set("maturity")} /></Field>
+          </>
+        )}
+        {step === 3 && (
+          <>
+            <Field label="Initial rate (% p.a.)" hint="Effective from the start date"><input required autoFocus type="number" min="0.01" step="0.01" data-testid="facility-rate-input" value={form.rate} onChange={set("rate")} /></Field>
+            <Field label="Day-count convention">
+              <Segmented testId="facility-day-count" value={form.day_count} options={DAY_COUNT} onChange={(v) => setForm({ ...form, day_count: v })} />
+            </Field>
+            <div className="wizard-preview" data-testid="wizard-formula-preview">
+              <b>Formula preview</b>
+              <span className="mono">Outstanding × {form.rate || "0"}% × Days ÷ {form.day_count}</span>
+            </div>
+          </>
+        )}
         <div className="form-actions">
-          <button type="button" className="outline" onClick={onClose} data-testid="facility-form-cancel-button">Cancel</button>
-          <button type="submit" className="primary" disabled={saving} data-testid="facility-form-submit-button">{saving ? "Saving…" : "Save facility"}</button>
+          {step > 1 ? (
+            <button type="button" className="outline" data-testid="wizard-back-button" onClick={() => setStep(step - 1)}>Back</button>
+          ) : (
+            <button type="button" className="outline" onClick={onClose} data-testid="facility-form-cancel-button">Cancel</button>
+          )}
+          {step < 3 ? (
+            <button type="button" className="primary" disabled={!valid[step]} data-testid="wizard-next-button" onClick={() => setStep(step + 1)}>Next</button>
+          ) : (
+            <button type="submit" className="primary" disabled={saving || !valid[3]} data-testid="facility-form-submit-button">{saving ? "Saving…" : "Create facility"}</button>
+          )}
         </div>
       </form>
     </Modal>

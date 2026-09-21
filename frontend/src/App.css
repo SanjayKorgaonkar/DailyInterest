@@ -48,6 +48,18 @@ td.empty{text-align:center;color:var(--muted);padding:36px;white-space:normal}
 .modal-head h2{font:600 22px Chivo;margin:6px 0 0}
 .modal-body{padding:24px 28px 28px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 20px}
+.wizard-progress{display:flex;align-items:center;gap:0;margin-bottom:24px}
+.wizard-step{display:flex;align-items:center;gap:8px;flex:1;position:relative}
+.wizard-step:not(:last-child)::after{content:"";flex:1;height:1px;background:var(--line);margin:0 10px}
+.wizard-dot{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--paper);border:1.5px solid var(--line);color:var(--muted);font:700 11px 'IBM Plex Sans';flex-shrink:0;transition:all .25s}
+.wizard-step.active .wizard-dot{background:var(--blue);border-color:var(--blue);color:#fff}
+.wizard-step.done .wizard-dot{background:var(--green);border-color:var(--green);color:#fff}
+.wizard-step small{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap}
+.wizard-step.active small{color:var(--ink)}
+.wizard-body{min-height:150px;align-content:flex-start}
+.wizard-preview{grid-column:1/-1;background:var(--paper);border:1px dashed var(--line);padding:12px 15px;margin-top:4px}
+.wizard-preview b{display:block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.wizard-preview span{font-size:13px;color:var(--ink)}
 .field{display:flex;flex-direction:column;gap:7px;font-size:12px}
 .field>span{font-size:10px;font-weight:700;letter-spacing:.9px;color:#66748a;text-transform:uppercase}
 .field input,.field select{border:1px solid var(--line);padding:10px 12px;font:inherit;font-size:13px;color:var(--ink);background:#fff;width:100%}
