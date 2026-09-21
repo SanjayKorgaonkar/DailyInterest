@@ -40,7 +40,7 @@ td.empty{text-align:center;color:var(--muted);padding:36px;white-space:normal}
 .cert-reminder b{display:block;font:600 14px Chivo;color:#7a231d}
 .cert-reminder span{display:block;color:#9a4a43;font-size:12px;margin-top:3px}
 .cert-reminder-pills{display:flex;gap:8px;flex-wrap:wrap;align-self:center}
-.cert-pill{display:inline-flex;align-items:center;gap:4px;border:1px solid #e39b93;background:#fff;color:#a3352c;padding:7px 12px;font:600 11px 'IBM Plex Sans';cursor:pointer;transition:transform .2s,background .2s}
+.cert-pill{display:inline-flex;align-items:center;gap:4px;border:1px solid #e39b93;background:#fff;color:#a3352c;padding:7px 12px;font:600 11px 'IBM Plex Sans';cursor:pointer;transition:transform .2s,background .2s}.cert-countdown{display:inline-flex;align-items:center;gap:5px;background:#0f172a;color:#fff;padding:7px 12px;font:600 11px 'IBM Plex Sans';white-space:nowrap}
 .cert-pill:hover{background:#fde4e2;transform:translateY(-1px)}
 @media(max-width:700px){.mapping-grid{grid-template-columns:1fr}}
 @media(max-width:900px){.cert-reminder{flex-direction:column}.cert-reminder-pills{margin-left:0}}

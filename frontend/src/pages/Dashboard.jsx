@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { AlertTriangle, ChevronRight, FileDown, Upload } from "lucide-react";
+import { AlertTriangle, ChevronRight, Clock, FileDown, Upload } from "lucide-react";
 import { Header } from "../components/Header";
-import { money, rupee, monthLong, pct } from "../lib/format";
+import { money, rupee, monthLong, pct, daysUntilMonthEnd } from "../lib/format";
 import { api, errorText } from "../lib/api";
 
 export default function Dashboard({ data, onNavigate, month, onAction }) {
@@ -13,6 +13,7 @@ export default function Dashboard({ data, onNavigate, month, onAction }) {
     ["Available limit", money(d.available), `${(100 - d.utilisation).toFixed(1)}% headroom`, "green"],
   ];
   const pending = d.pending_certificates || [];
+  const daysLeft = daysUntilMonthEnd();
   const [downloading, setDownloading] = useState(false);
   const downloadChecklist = async () => {
     if (downloading) return;
@@ -42,6 +43,9 @@ export default function Dashboard({ data, onNavigate, month, onAction }) {
             <span>Enter last month's bank-charged interest so reconciliation is complete before you close the books.</span>
           </div>
           <div className="cert-reminder-pills">
+            <span className="cert-countdown" data-testid="days-remaining-badge">
+              <Clock size={12} /> {daysLeft} day{daysLeft === 1 ? "" : "s"} to month-end close
+            </span>
             {pending.map((p) => (
               <button key={p.facility_id} className="cert-pill" data-testid={`pending-cert-${p.facility_id}`}
                 onClick={() => onNavigate(p.type === "CC" ? "cc" : "wcdl", { facilityId: p.facility_id, month: p.month })}>

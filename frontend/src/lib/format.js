@@ -16,4 +16,10 @@ export const monthOptions = (count = 12) => {
 };
 
 export const today = () => new Date().toISOString().slice(0, 10);
+export const daysUntilMonthEnd = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return Math.round((end - start) / 86400000);
+};
 export const fmtDate = (s) => (s ? new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
