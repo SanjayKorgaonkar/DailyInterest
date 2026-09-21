@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 8 tested the new post-wizard 'success screen + auto-jump + auto-open-form' behaviour. All 3 user flows and 2 regression checks passed end-to-end against the public URL. DB left clean (0 facilities) as user requires.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "cc_wizard_success_and_autojump": "PASS — After Create facility, wizard-success screen appears within same modal with checkmark + 'Test Bank Alpha · Cash Credit created' text + both action buttons. Facility persisted (verified via GET /api/facilities) before button click. Clicking wizard-add-transaction-button closes the modal, navigates to CC Interest Working, auto-selects the new facility in cc-facility-select, and auto-opens cc-transaction-form.",
+    "wcdl_wizard_success_and_autojump": "PASS — Same behaviour for WCDL: navigates to WCDL Interest Working, wcdl-facility-select is set to the new facility id (not the 'All' empty value), and wcdl-loan-form auto-opens.",
+    "skip_path": "PASS — Clicking wizard-skip-transaction-button closes the modal, shows the success toast ('Test Bank Gamma · CC Later created'), stays on Facilities page, and the new facility row is visible in the table.",
+    "regression_autoopen_is_one_time": "PASS — After closing the auto-opened CC form and navigating Dashboard→CC (and Dashboard→WCDL for the WCDL case), the transaction/loan form does NOT re-appear. Auto-open is correctly tied to the single creation event.",
+    "regression_dashboard_no_autoopen": "PASS — Navigating to Dashboard does not accidentally auto-open cc-transaction-form or wcdl-loan-form. (Pending-cert pill was not exercisable because no transactions/certificates existed in the empty DB, but code review of App.js go() shows only wizard's onSaved(f,true) sets autoOpenForm=true; Dashboard's onNavigate calls never pass autoOpenForm.)",
+    "backend_persistence": "PASS — POST /api/facilities returns 200 with the created facility; DELETE /api/facilities/{id} returns 204 for all 3 test facilities.",
+    "cleanup": "PASS — DB restored to 0 facilities at end of run."
+  },
+  "critical_code_review_comments": [
+    "React hydration warning observed in console: '<span> cannot be a child of <option>'. This is caused by a dev-time source-map/instrumentation overlay injecting <span x-excluded=true style=display:contents> inside <option> elements (in CCWorking cc-facility-select, and likely other <option>s that render children). It is a warning only, not a functional bug, but should be suppressed if this instrumentation is under our control.",
+    "Facilities.jsx line 46: destructuring `(f, jump)` from onSaved is fine, but the FacilityForm modal's own onClose (top-right X) calls `onSaved(created, false)` while the created screen is showing. Semantically that's the same as 'skip'; make sure that is the intended UX (it is, per current spec).",
+    "CCWorking.jsx / WCDLWorking.jsx auto-open effect: `useEffect(() => { if (focusFacilityId && autoOpenForm) setShowForm(true); }, [focusFacilityId, autoOpenForm])` correctly re-fires only when those specific props change again. However, if the user creates a second facility of the same type without changing autoOpen (already true from prior jump) or same facilityId, the effect won't re-fire — currently this is fine because App.js `go()` resets autoOpen for every nav that doesn't set it, but worth remembering."
+  ],
+  "test_report_links": [],
+  "action_items": [],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "N/A — no auth",
+  "seed_data_creation": "Created 3 test facilities via the wizard (Test Bank Alpha CC, Test Bank Beta WCDL, Test Bank Gamma CC) and DELETED all 3 via DELETE /api/facilities/{id} at end of run. DB confirmed back to 0 facilities.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "DB is intentionally empty (0 facilities, app_meta.seed_disabled=true). Create your own test data through the UI/API and clean up via DELETE. Iteration 8 end-state verified 0 facilities remaining."
+}
