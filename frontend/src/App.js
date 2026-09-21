@@ -26,6 +26,7 @@ function App() {
   const [mobile, setMobile] = useState(false);
   const [month, setMonth] = useState(MONTHS[0]);
   const [jumpFacility, setJumpFacility] = useState(null);
+  const [autoOpen, setAutoOpen] = useState(false);
   const [toast, setToast] = useState("");
   const pendingCount = data.dashboard.pending_certificates?.length || 0;
   const action = (text) => { setToast(text); setTimeout(() => setToast(""), 2800); };
@@ -41,6 +42,7 @@ function App() {
     setMobile(false);
     if (opts?.month) setMonth(opts.month);
     setJumpFacility(opts?.facilityId || null);
+    setAutoOpen(!!opts?.autoOpenForm);
   };
   return (
     <div className="app-shell">
@@ -80,9 +82,9 @@ function App() {
         </header>
         <section className="content">
           {page === "dashboard" && <Dashboard data={data} onNavigate={go} month={month} onAction={action} />}
-          {page === "facilities" && <Facilities data={data.facilities} onAction={action} reload={reload} />}
-          {page === "cc" && <CCWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} />}
-          {page === "wcdl" && <WCDLWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} />}
+          {page === "facilities" && <Facilities data={data.facilities} onAction={action} reload={reload} onNavigate={go} />}
+          {page === "cc" && <CCWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} autoOpenForm={autoOpen} />}
+          {page === "wcdl" && <WCDLWorking facilities={data.facilities} month={month} onAction={action} refreshAll={reload} focusFacilityId={jumpFacility} autoOpenForm={autoOpen} />}
           {page === "recon" && <Reconciliation rows={data.recon} month={month} onAction={action} />}
           {page === "reports" && <Reports onAction={action} month={month} />}
         </section>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { History, Trash2 } from "lucide-react";
+import { CheckCircle2, History, Trash2 } from "lucide-react";
 import { Header } from "../components/Header";
 import { Modal, Field, Segmented } from "../components/Modal";
 import { api, errorText } from "../lib/api";
@@ -7,7 +7,7 @@ import { money, pct, fmtDate, today } from "../lib/format";
 
 const DAY_COUNT = [{ value: 365, label: "Actual / 365" }, { value: 360, label: "Actual / 360" }];
 
-export default function Facilities({ data, onAction, reload }) {
+export default function Facilities({ data, onAction, reload, onNavigate }) {
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [rateFor, setRateFor] = useState(null);
@@ -43,7 +43,12 @@ export default function Facilities({ data, onAction, reload }) {
           </tbody>
         </table>
       </div>
-      {showForm && <FacilityForm onClose={() => setShowForm(false)} onSaved={(f) => { setShowForm(false); onAction(`${f.bank} · ${f.name} saved`); reload(); }} onError={onAction} />}
+      {showForm && <FacilityForm onClose={() => setShowForm(false)} onSaved={(f, jump) => {
+        setShowForm(false);
+        onAction(`${f.bank} · ${f.name} created`);
+        reload();
+        if (jump) onNavigate?.(f.type === "CC" ? "cc" : "wcdl", { facilityId: f.id, autoOpenForm: true });
+      }} onError={onAction} />}
       {selected && <RateHistory facility={selected} onClose={() => setRateFor(null)} onAction={onAction} reload={reload} />}
     </>
   );
@@ -53,6 +58,7 @@ function FacilityForm({ onClose, onSaved, onError }) {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ bank: "", type: "CC", name: "", limit: "", start: today(), maturity: "On demand", status: "Active", day_count: 365, rate: "" });
   const [saving, setSaving] = useState(false);
+  const [created, setCreated] = useState(null);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const STEPS = [
     { n: 1, label: "Basics" },
@@ -69,9 +75,24 @@ function FacilityForm({ onClose, onSaved, onError }) {
     setSaving(true);
     try {
       const r = await api.post("/facilities", { ...form, bank: form.bank.trim(), name: form.name.trim(), limit: Number(form.limit), rate: Number(form.rate) });
-      onSaved(r.data);
+      setCreated(r.data);
     } catch (err) { onError(errorText(err)); } finally { setSaving(false); }
   };
+  if (created) {
+    return (
+      <Modal title="New facility" eyebrow="FACILITY MASTER · QUICK-START" onClose={() => onSaved(created, false)} testId="facility-form">
+        <div className="wizard-success" data-testid="wizard-success">
+          <CheckCircle2 size={32} />
+          <b>{created.bank} · {created.name} created</b>
+          <span>Want to log its first transaction now so the Dashboard shows real numbers right away?</span>
+          <div className="form-actions">
+            <button type="button" className="outline" data-testid="wizard-skip-transaction-button" onClick={() => onSaved(created, false)}>I'll do this later</button>
+            <button type="button" className="primary" data-testid="wizard-add-transaction-button" onClick={() => onSaved(created, true)}>Add first transaction</button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
   return (
     <Modal title="New facility" eyebrow="FACILITY MASTER · QUICK-START" onClose={onClose} testId="facility-form">
       <div className="wizard-progress" data-testid="wizard-progress">

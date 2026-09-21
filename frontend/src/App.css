@@ -60,6 +60,11 @@ td.empty{text-align:center;color:var(--muted);padding:36px;white-space:normal}
 .wizard-preview{grid-column:1/-1;background:var(--paper);border:1px dashed var(--line);padding:12px 15px;margin-top:4px}
 .wizard-preview b{display:block;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
 .wizard-preview span{font-size:13px;color:var(--ink)}
+.wizard-success{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:20px 10px}
+.wizard-success svg{color:var(--green)}
+.wizard-success b{font:600 17px Chivo}
+.wizard-success span{color:var(--muted);font-size:13px;max-width:360px}
+.wizard-success .form-actions{margin-top:8px}
 .field{display:flex;flex-direction:column;gap:7px;font-size:12px}
 .field>span{font-size:10px;font-weight:700;letter-spacing:.9px;color:#66748a;text-transform:uppercase}
 .field input,.field select{border:1px solid var(--line);padding:10px 12px;font:inherit;font-size:13px;color:var(--ink);background:#fff;width:100%}
