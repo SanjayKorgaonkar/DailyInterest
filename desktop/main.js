@@ -1,8 +1,9 @@
 const { app, BrowserWindow, dialog } = require("electron");
 const path = require("path");
 const http = require("http");
+const net = require("net");
 const fs = require("fs");
-const { spawn } = require("child_process");
+const { spawn, execFileSync } = require("child_process");
 
 let mongoProcess = null;
 let backendProcess = null;
@@ -32,8 +33,31 @@ function startMongo() {
     }
     mongoProcess = spawn(mongodPath, ["--dbpath", mongoDataDir, "--port", String(MONGO_PORT), "--bind_ip", "127.0.0.1"]);
     mongoProcess.on("error", reject);
-    // mongod binds its port quickly on a local data dir; a short fixed wait is reliable
-    setTimeout(resolve, 2500);
+
+    const startedAt = Date.now();
+    const checkMongo = () => {
+      const socket = net.createConnection({
+        host: "127.0.0.1",
+        port: MONGO_PORT,
+      });
+
+      socket.on("connect", () => {
+        socket.destroy();
+        resolve();
+      });
+
+      socket.on("error", () => {
+        socket.destroy();
+
+        if (Date.now() - startedAt > 30000) {
+          reject(new Error("MongoDB did not become ready within 30 seconds."));
+        } else {
+          setTimeout(checkMongo, 250);
+        }
+      });
+    };
+
+    checkMongo();
   });
 }
 
@@ -110,12 +134,53 @@ async function createWindow() {
   await mainWindow.loadURL(`http://127.0.0.1:${FRONTEND_PORT}`);
 }
 
-function killAll() {
-  if (backendProcess) backendProcess.kill();
-  if (mongoProcess) mongoProcess.kill();
-  if (staticServer) staticServer.close();
+function killProcessTree(proc) {
+  if (!proc || !proc.pid) return;
+
+  try {
+    if (process.platform === "win32") {
+      execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+        windowsHide: true,
+        stdio: "ignore",
+      });
+    } else {
+      proc.kill();
+    }
+  } catch (err) {
+    console.error("Failed to stop process:", err);
+  }
 }
 
+function killAll() {
+  killProcessTree(backendProcess);
+  killProcessTree(mongoProcess);
+
+  if (staticServer) {
+    try {
+      staticServer.close();
+    } catch (err) {
+      console.error("Failed to close static server:", err);
+    }
+  }
+
+  backendProcess = null;
+  mongoProcess = null;
+  staticServer = null;
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
+app.on("second-instance", () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    mainWindow.show();
+  }
+});
 app.whenReady().then(async () => {
   try {
     await startMongo();
@@ -133,3 +198,7 @@ app.on("window-all-closed", () => {
   app.quit();
 });
 app.on("before-quit", killAll);
+
+
+
+

@@ -25,7 +25,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "resources/icon.png"
+      "icon": "resources/icon.png",
+      "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
