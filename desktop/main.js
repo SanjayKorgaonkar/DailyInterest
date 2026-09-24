@@ -9,6 +9,23 @@ let backendProcess = null;
 let staticServer = null;
 let mainWindow = null;
 
+// Prevent multiple simultaneous instances (e.g. the NSIS installer's
+// "run after install" launch plus the user also double-clicking the
+// desktop shortcut). Without this, a second process would try to bind
+// the same fixed ports/mongod data directory as the first and the OS
+// disambiguates the duplicate windows with a "[2] Ledgerline" title.
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 const resourcesPath = app.isPackaged
   ? process.resourcesPath
   : path.join(__dirname, "resources");
@@ -31,7 +48,7 @@ function startMongo() {
       return;
     }
     mongoProcess = spawn(mongodPath, ["--dbpath", mongoDataDir, "--port", String(MONGO_PORT), "--bind_ip", "127.0.0.1"]);
-    mongoProcess.on("error", reject);
+    mongoProcess.once("error", reject);
     // mongod binds its port quickly on a local data dir; a short fixed wait is reliable
     setTimeout(resolve, 2500);
   });
@@ -51,10 +68,12 @@ function startBackend() {
         DB_NAME: "ledgerline",
         CORS_ORIGINS: "*",
         PORT: String(BACKEND_PORT),
+        // SEED_DEMO_DATA is intentionally left unset so every desktop
+        // install starts completely empty - see backend/seed.py.
       },
     });
-    backendProcess.on("error", reject);
-    waitForBackend(resolve, reject, 40);
+    backendProcess.once("error", reject);
+    waitForBackend(resolve, reject, 60);
   });
 }
 
@@ -72,7 +91,7 @@ function waitForBackend(resolve, reject, attemptsLeft) {
 }
 
 function startStaticServer() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const buildDir = path.join(resourcesPath, "frontend-build");
     const mime = {
       ".html": "text/html", ".js": "application/javascript", ".css": "text/css",
@@ -94,6 +113,7 @@ function startStaticServer() {
         res.end(data);
       });
     });
+    staticServer.once("error", reject);
     staticServer.listen(FRONTEND_PORT, "127.0.0.1", resolve);
   });
 }
@@ -107,6 +127,8 @@ async function createWindow() {
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
   mainWindow.setMenuBarVisibility(false);
+  // Keep the title fixed regardless of what the loaded page sets as document.title
+  mainWindow.on("page-title-updated", (event) => event.preventDefault());
   await mainWindow.loadURL(`http://127.0.0.1:${FRONTEND_PORT}`);
 }
 
@@ -116,20 +138,24 @@ function killAll() {
   if (staticServer) staticServer.close();
 }
 
-app.whenReady().then(async () => {
-  try {
-    await startMongo();
-    await startBackend();
-    await startStaticServer();
-    await createWindow();
-  } catch (err) {
-    dialog.showErrorBox("Ledgerline failed to start", String(err.message || err));
-    app.quit();
-  }
-});
+if (gotLock) {
+  app.whenReady().then(async () => {
+    try {
+      await startMongo();
+      await startBackend();
+      await startStaticServer();
+      await createWindow();
+    } catch (err) {
+      dialog.showErrorBox("Ledgerline failed to start", String(err.message || err));
+      killAll();
+      app.quit();
+    }
+  });
 
-app.on("window-all-closed", () => {
-  killAll();
-  app.quit();
-});
-app.on("before-quit", killAll);
+  app.on("window-all-closed", () => {
+    killAll();
+    app.quit();
+  });
+  app.on("before-quit", killAll);
+}
+

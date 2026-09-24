@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -38,6 +39,13 @@ WCDL_LOANS = [
 
 
 async def seed_if_empty(db):
+    # Demo data is opt-in only (set SEED_DEMO_DATA=true in backend/.env for a
+    # throwaway demo environment). Every other environment - including every
+    # fresh desktop install, which always starts with a brand-new local
+    # MongoDB that has never seen the seed_disabled flag below - starts
+    # completely empty by default.
+    if os.environ.get("SEED_DEMO_DATA", "false").lower() != "true":
+        return
     if await db.app_meta.find_one({"key": "seed_disabled"}):
         return
     if not await db.facilities.count_documents({}):
