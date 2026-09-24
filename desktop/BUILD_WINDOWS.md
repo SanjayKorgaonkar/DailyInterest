@@ -49,6 +49,11 @@ From the `desktop/` folder, double-click **`build.bat`**. It will, in order:
 
 Output: `desktop\dist\Ledgerline Setup.exe`
 
+> **If you already built this before 2026-09-21**: rebuild — two bugs were fixed
+> since then (duplicate "[2] Ledgerline" window instances, and demo/sample data
+> auto-appearing on fresh installs). Re-run `build.bat` from scratch to pick up
+> the fix; uninstall the old version first if Windows complains about a conflict.
+
 ## Test the installer
 Run `Ledgerline Setup.exe` on the build machine (or copy it to another Windows PC).
 It installs like any normal app, adds a desktop shortcut, and on launch:

@@ -1,0 +1,42 @@
+{
+  "summary": "Verified SEED_DEMO_DATA env-var gate in backend/seed.py with 6 pytest cases against throwaway MongoDB databases. All 6 pass: unset/false -> 0 inserts on fresh empty DB; true -> 4 facilities + 6 CC txns + 2 WCDL loans inserted; true + preexisting app_meta.seed_disabled -> still 0 inserts (backward compat gate). Live preview regression PASSES: GET /api/ returns 200 and GET /api/facilities returns [] (empty) - the real DB was NOT touched. desktop/main.js code-reviewed and passed `node -c` syntax check; requestSingleInstanceLock is called before app.whenReady, second-instance handler focuses/restores mainWindow, mongo/backend/static-server promises reject on 'error' events, page-title-updated is prevented in createWindow. Full backend suite has 12 pre-existing failures - all are stale tests that hardcoded assumptions about auto-seeded demo data (icici-cc/hdfc-cc/axis-wcdl/sbi-wcdl); this is consistent with (and validates) the intended fix, not a regression.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "N/A (test suite)", "issue": "12 legacy pytest tests in test_backend_api.py, test_dashboard_pending.py (test_seed_data_integrity), test_interest_endpoints.py, test_statement_import.py::test_commit_on_wcdl_rejected, test_inline_edit.py::TestWCDLLoanUpdate[GML] hardcode assumptions about the old auto-seeded demo facilities (icici-cc, hdfc-cc, axis-wcdl, sbi-wcdl). Now that seeding is opt-in via SEED_DEMO_DATA, these tests fail on an empty DB. They should either (a) be updated to POST their own fixture facilities via /api/facilities before asserting, or (b) be run with SEED_DEMO_DATA=true. Not a regression from this session's change - it's the natural consequence of the intended behavior change."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "desktop_main_js_review": {
+    "syntax_check": "PASS (node -c desktop/main.js)",
+    "single_instance_lock": "PASS - app.requestSingleInstanceLock() called at top of file (line 17) BEFORE app.whenReady() (line 142); if lock not acquired, app.quit() is called immediately.",
+    "second_instance_handler": "PASS - lines 21-26: on 'second-instance', if mainWindow exists, restore if minimized and focus. Correct behavior.",
+    "startup_promise_rejection": "PASS - startMongo/startBackend both use spawn().once('error', reject); startStaticServer uses server.once('error', reject). Previously could hang on port conflicts silently.",
+    "page_title_pinning": "PASS - line 131: mainWindow.on('page-title-updated', (event) => event.preventDefault()) prevents document.title from overriding 'Ledgerline'.",
+    "minor_observation": "startMongo uses a fixed 2500ms setTimeout to resolve rather than actively probing mongod readiness on port 27018. On slow disks this could resolve before mongod finishes binding. Not a bug per se (backend then polls itself), but a small robustness improvement would be to poll a TCP connect to 127.0.0.1:27018 like waitForBackend does for the backend. Non-blocking for this fix."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_seed_gate.py",
+    "/app/test_reports/pytest/seed_gate.xml",
+    "/app/test_reports/pytest/iteration_11.xml"
+  ],
+  "action_items": [
+    "Optional cleanup: update the 12 legacy tests listed above to create their own fixture data via API (POST /api/facilities etc.) instead of depending on auto-seeded demo data, OR mark them with a pytest fixture that sets SEED_DEMO_DATA=true and seeds a throwaway DB. Not blocking - the primary fix is verified working.",
+    "Optional robustness: replace the fixed 2500ms setTimeout in desktop/main.js startMongo() with an active TCP-connect readiness poll on port 27018 (mirroring waitForBackend's pattern) to avoid a race on slow disks."
+  ],
+  "critical_code_review_comments": [
+    "backend/seed.py: fix is minimal, correct, and defensive - env var checked first (fail-closed default), DB flag checked second (backward compat). Both gates prevent seeding independently. Verified in tests.",
+    "desktop/main.js: single-instance lock pattern is idiomatic Electron and correctly wired (lock check -> quit branch, second-instance handler under else, main startup guarded by `if (gotLock)`). Nothing wrong.",
+    "Legacy tests hardcoding seed IDs (icici-cc, hdfc-cc, etc.) are a pre-existing coupling issue exposed by this fix. Should be decoupled from demo data eventually."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_seed_gate.py (new)"
+  ],
+  "success_rate": {"backend": "100% on seed-gate + live-preview regression (6/6). Legacy suite: 35/47 pass; 12 legacy failures are stale-data expectations, not regressions.", "frontend": "N/A (skipped per request)"},
+  "test_credentials": "N/A - no auth in this app (accepted deferred finding).",
+  "seed_data_creation": "None. All seed-gate tests use throwaway databases (test_seed_gate_<uuid>) and drop them on teardown. Live preview DB (test_database) confirmed still empty (GET /api/facilities == []).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The SEED_DEMO_DATA gate in backend/seed.py is fully verified. If any new legacy-style test is added that expects demo data to preexist, either seed it explicitly via API or set SEED_DEMO_DATA=true in a fixture with a throwaway DB. Do NOT set SEED_DEMO_DATA in backend/.env - the live preview must stay empty by design. desktop/main.js cannot be exercised in this sandbox (no Windows/Electron); syntax and static logic have been reviewed and are sound.",
+  "rca of the issue": "Bug 2 root cause: seed_if_empty() previously only checked a MongoDB app_meta.seed_disabled flag document, which existed ONLY in the one cloud preview DB where it was manually inserted. Every fresh Windows install spun up a brand-new bundled mongod with an empty data dir, so the flag was absent and seeding always ran. Fix: added an env-var gate (SEED_DEMO_DATA, defaults false) as the primary check; the DB flag is kept only for backward compat. Because desktop/main.js never sets SEED_DEMO_DATA when spawning the backend, and backend/.env in the live preview also doesn't set it, no environment auto-seeds anymore by default. Verified with a genuinely empty MongoDB (throwaway db name) both directions: unset -> 0 inserts, true -> 4 facilities."
+}
